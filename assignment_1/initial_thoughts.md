@@ -21,3 +21,27 @@ Technology stack: What technologies might you use for front-end, back-end, datab
 - Front-end: next.js, tailwind css
 - Back-end: typescript
 - Database: postgreSQL
+
+# Anna Vu’s Synthesis of Initial Thoughts
+User Experience
+- Volunteer users will interact through a mobile-friendly web interface wherein they can onboard with three steps: registration → email verification → login → updating information to their profile (location, skills, availability, etc.). 
+    - Once registered, the app will display a dashboard of upcoming events, which includes suggested events that are tailored to the skills and preferences they are proficient in.
+    - Accept/Deny assignments; Display accepted tasks onto a calendar
+- Administrators will be provided with management capability tools including:
+    - event creation and editing
+    - assign event tasks
+    - view a list of matching volunteers
+    - view and export reports depicting event volunteer hours and participation
+    - define requirements.
+    - calendar view of general volunteer availabilities
+Key Functionalities
+- Login and registration with email verification and access based on roles (volunteer and admin)
+- Profile customization/management (volunteer)
+- Event creation/management (admin)
+- Volunteer Matching
+- Notifications
+- Volunteer history
+Technology Stack
+- Front-end: next.js, tailwind css, react
+- Back-end: typescript, FastAPI, Django, smtplib
+- Database: postgreSQL
