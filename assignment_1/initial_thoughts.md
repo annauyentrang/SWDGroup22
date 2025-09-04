@@ -1,1 +1,5 @@
 # Syed Maisum's Initial Thoughts
+
+- The application will be a web application where volunteers should have a simple registration/login, then a guided profile setup and dashboard that shows upcoming events they’re matched to and participation history. Administrators should have tools to create/manage events and define requirements.
+- The application must have a feature for users to register and log-in, there must be a feature for volunteers to be able to customize their profile with information such as location and skills, administrators must have the abillity to create and manage events, there must be some sort of feature that matches volunteers to events, the app should have a feature that sends notifications to volunteers, and the app should track voluneer's history.
+- React/JS/HTML/CSS can be used for the front-end, either FastAPI or Django may be used for the back-end, PostgreSQL can be used as the database, and notifications can be sent through Python's built-in smtplib library.
