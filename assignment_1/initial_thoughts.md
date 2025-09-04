@@ -21,3 +21,10 @@ Technology stack: What technologies might you use for front-end, back-end, datab
 - Front-end: next.js, tailwind css
 - Back-end: typescript
 - Database: postgreSQL
+
+# Maral Krikorian Intial Thoughts
+- The application will allow the volunteer to create their own account / profile, then based on the information provided the system will try to match with any of the locations that the administrator created as accurately as possible based on skills, distance, and priority. 
+- Administrators will have access to the database of all the volunteers, centralized records with contact info, skills, credentials, availability, locations, and be able to keep track of their hours, volunteer check-in/out, and hours approval by event/shift; optionally track mileage/expenses for reimbursement; supervisor sign-off and audit trail. They’d also be able to manually place people into roles/shifts if necessary, and update the status of volunteers based on multiple factors including but not limited to background, training, and form completions.  
+- Front-end: next.js, Tailwind CSS, HTML
+- Back-end: typescript, Django
+- Database: postgreSQL
