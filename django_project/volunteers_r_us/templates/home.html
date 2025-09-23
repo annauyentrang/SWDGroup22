@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+{% block title %}Home • VolunteerHub{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-7">
+    <div class="p-4 p-md-5 bg-white border rounded-3">
+      <h1 class="h3 mb-3">Welcome to VolunteersRUs</h1>
+      <p class="text-secondary">
+        This is the front-end prototype. Use the buttons above to view the Login and Registration pages.
+      </p>
+      <div class="d-flex gap-2">
+        <a class="btn btn-primary" href="{% url 'login' %}">Go to Login</a>
+        <a class="btn btn-outline-primary" href="{% url 'register' %}">Create an Account</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
