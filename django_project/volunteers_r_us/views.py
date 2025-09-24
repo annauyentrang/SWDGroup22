@@ -11,6 +11,12 @@ def login(request):
 
 def register(request):
     return render(request, 'register.html')
+    
+def profile_form(request):
+    return render(request, "profile_form.html")
+
+def event_form(request):
+    return render(request, "event_form.html")
 
 # volunteers_r_us/views.py
 from django.shortcuts import render

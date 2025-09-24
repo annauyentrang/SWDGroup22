@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Manage Events · VolunteersRUs{% endblock %}
+{% block content %}
+<div class="container py-4">
+  <div class="row justify-content-center">
+    <div class="col-lg-8">
+      <div class="bg-white border rounded-3 p-4 p-md-5">
+        <div class="d-flex align-items-center justify-content-between mb-3">
+          <h1 class="h4 mb-0">Event Management</h1>
+          <a class="btn btn-outline-secondary btn-sm" href="{% url 'home' %}">Back to Home</a>
+        </div>
+        <p class="text-secondary">Administrators can create and manage events using this form.</p>
+
+        <form method="post" novalidate>
+          {% csrf_token %}
+
+          <div class="row g-3">
+            <div class="col-12">
+              <label for="event_name" class="form-label">Event Name <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" id="event_name" name="event_name" maxlength="100" required>
+              <div class="form-text">Max 100 characters.</div>
+            </div>
+
+            <div class="col-12">
+              <label for="event_description" class="form-label">Event Description <span class="text-danger">*</span></label>
+              <textarea class="form-control" id="event_description" name="event_description" rows="4" required></textarea>
+            </div>
+
+            <div class="col-12">
+              <label for="location" class="form-label">Location <span class="text-danger">*</span></label>
+              <textarea class="form-control" id="location" name="location" rows="2" required></textarea>
+            </div>
+
+            <div class="col-12">
+              <label for="required_skills" class="form-label">Required Skills <span class="text-danger">*</span></label>
+              <select class="form-select" id="required_skills" name="required_skills" multiple required>
+                <option value="first_aid">First Aid</option>
+                <option value="teaching">Teaching</option>
+                <option value="logistics">Logistics</option>
+                <option value="cooking">Cooking</option>
+                <option value="it_support">IT Support</option>
+                <option value="translation">Translation</option>
+                <option value="childcare">Childcare</option>
+                <option value="elderly_care">Elderly Care</option>
+                <option value="pet_care">Pet Care</option>
+                <option value="public_speaking">Public Speaking</option>
+                <option value="graphic_design">Graphic Design</option>
+              </select>
+              <div class="form-text">Hold Command (⌘) on Mac or Ctrl on Windows to select multiple.</div>
+            </div>
+
+            <div class="col-md-6">
+              <label for="urgency" class="form-label">Urgency <span class="text-danger">*</span></label>
+              <select class="form-select" id="urgency" name="urgency" required>
+                <option value="">Choose...</option>
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+                <option value="critical">Critical</option>
+              </select>
+            </div>
+
+            <div class="col-md-6">
+              <label for="event_date" class="form-label">Event Date <span class="text-danger">*</span></label>
+              <input type="date" class="form-control" id="event_date" name="event_date" required>
+            </div>
+          </div>
+
+          <div class="d-flex justify-content-end gap-2 mt-4">
+            <a href="{% url 'home' %}" class="btn btn-outline-secondary">Cancel</a>
+            <button type="submit" class="btn btn-primary">Create Event</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
