@@ -114,3 +114,107 @@ def match_volunteer(request):
         "match_reason": match_reason, "warnings": warnings, "saved": saved, "errors": errors,
     }
     return render(request, "match_form.html", ctx)
+
+VOLUNTEERS = {
+    "1": "Nareh Hovhanesian",
+    "2": "Katia Qahwajian",
+    "3": "Simon Zhamkochyan",
+    "4": "Anglina Samsonyan",
+}
+
+HISTORY = [
+    {
+        "volunteer": "1",
+        "volunteer_name": VOLUNTEERS["1"],
+        "event_name": "Park Cleanup",
+        "event_description": "Neighborhood park litter & brush removal.",
+        "location": "Memorial Park, Houston TX",
+        "required_skills": ["Lifting", "Driving"],
+        "urgency": "High",
+        "event_date": date(2025, 9, 28),
+        "capacity": "0 / 25",
+        "languages": ["English", "Vietnamese"],
+        "status": "Registered",
+    },
+    {
+        "volunteer": "2",
+        "volunteer_name": VOLUNTEERS["2"],
+        "event_name": "Blood Donation Desk",
+        "event_description": "Check-in and refreshments table.",
+        "location": "Community Center, Suite B",
+        "required_skills": ["Customer Service", "Organization"],
+        "urgency": "Medium",
+        "event_date": date(2025, 10, 5),
+        "capacity": "12 / 15",
+        "languages": ["English"],
+        "status": "Attended",
+    },
+    {
+        "volunteer": "1",
+        "volunteer_name": VOLUNTEERS["1"],
+        "event_name": "Food Drive Sorting",
+        "event_description": "Sort non-perishables; label and stock shelves.",
+        "location": "St. Mary’s Hall",
+        "required_skills": ["Lifting", "Inventory"],
+        "urgency": "Low",
+        "event_date": date(2025, 10, 19),
+        "capacity": "30 / 40",
+        "languages": ["English", "Spanish"],
+        "status": "No-Show",
+    },
+    {
+        "volunteer": "4",
+        "volunteer_name": VOLUNTEERS["4"],
+        "event_name": "Shelter Meal Prep",
+        "event_description": "Prep and package warm meals for families.",
+        "location": "Hope Shelter Kitchen",
+        "required_skills": ["Cooking", "Organization"],
+        "urgency": "High",
+        "event_date": date(2025, 10, 22),
+        "capacity": "8 / 12",
+        "languages": ["English"],
+        "status": "Cancelled",
+    },
+    
+]
+
+
+def volunteer_history(request):
+    v = (request.GET.get("volunteer") or "").strip()
+    s = (request.GET.get("status") or "").strip()
+    f = (request.GET.get("from") or "").strip()
+    t = (request.GET.get("to") or "").strip()
+
+    def parse(d: str):
+        try:
+            return datetime.strptime(d, "%Y-%m-%d").date()
+        except Exception:
+            return None
+
+    fdate, tdate = parse(f), parse(t)
+
+    rows = []
+    for r in HISTORY:
+        if v and r["volunteer"] != v:
+            continue
+        if s and r["status"] != s:
+            continue
+        if fdate and r["event_date"] < fdate:
+            continue
+        if tdate and r["event_date"] > tdate:
+            continue
+        rows.append(r)
+
+    rows.sort(key=lambda x: x["event_date"], reverse=True)
+    volunteers_list = [{"id": k, "name": vname} for k, vname in VOLUNTEERS.items()]
+
+    return render(
+        request,
+        "volunteer_history.html",
+        {
+            "rows": rows,
+            "volunteers": volunteers_list,
+            "filters": {"volunteer": v, "status": s, "from": f, "to": t},
+        },
+    )
+
