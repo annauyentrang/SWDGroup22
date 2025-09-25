@@ -197,7 +197,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const f=(fromDate.value||'').trim();
     const t=(toDate.value||'').trim();
 
-    let shown=0, total=rows.length - 1; // subtract noRows row (present but hidden)
+    let shown=0, total=rows.length - 1; 
     rows.forEach(tr=>{
       if (tr.id === 'noRows') return;
       const rv=tr.dataset.volunteer||'';
@@ -240,7 +240,7 @@ document.addEventListener('DOMContentLoaded', function () {
         skills.setCustomValidity('');
       }
       if (!partForm.checkValidity()) { e.preventDefault(); e.stopPropagation(); partForm.classList.add('was-validated'); return; }
-      // mock "save": close and reset
+      // "save": close and reset
       e.preventDefault();
       const modalEl = $('#addEditModal');
       const modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
