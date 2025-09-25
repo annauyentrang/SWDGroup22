@@ -121,3 +121,7 @@ STATIC_URL = "static/"
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+TEMPLATES[0]["OPTIONS"]["context_processors"] += [
+    "volunteers_r_us.context_processors.notifications_ctx",
+]

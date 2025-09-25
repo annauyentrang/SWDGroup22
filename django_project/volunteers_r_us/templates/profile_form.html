@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% block title %}Complete Your Profile · VolunteersRUs{% endblock %}
+{% block content %}
+<div class="container py-4">
+  <div class="row justify-content-center">
+    <div class="col-lg-8">
+      <div class="bg-white border rounded-3 p-4 p-md-5">
+        <div class="d-flex align-items-center justify-content-between mb-3">
+          <h1 class="h4 mb-0">Complete Your Profile</h1>
+          <a class="btn btn-outline-secondary btn-sm" href="{% url 'home' %}">Back to Home</a>
+        </div>
+        <p class="text-secondary">After registration, please complete your profile to start volunteering.</p>
+
+        <form method="post" novalidate>
+          {% csrf_token %}
+
+          <div class="row g-3">
+            <div class="col-12">
+              <label for="full_name" class="form-label">Full Name <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" id="full_name" name="full_name" maxlength="50" required>
+              <div class="form-text">Max 50 characters.</div>
+            </div>
+
+            <div class="col-12">
+              <label for="address1" class="form-label">Address 1 <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" id="address1" name="address1" maxlength="100" required>
+              <div class="form-text">Max 100 characters.</div>
+            </div>
+
+            <div class="col-12">
+              <label for="address2" class="form-label">Address 2</label>
+              <input type="text" class="form-control" id="address2" name="address2" maxlength="100">
+            </div>
+
+            <div class="col-md-6">
+              <label for="city" class="form-label">City <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" id="city" name="city" maxlength="100" required>
+            </div>
+
+            <div class="col-md-3">
+              <label for="state" class="form-label">State <span class="text-danger">*</span></label>
+              <select class="form-select" id="state" name="state" required>
+                <option value="">Choose...</option>
+                <option value="AL">AL</option><option value="AK">AK</option><option value="AZ">AZ</option>
+                <option value="AR">AR</option><option value="CA">CA</option><option value="CO">CO</option>
+                <option value="CT">CT</option><option value="DE">DE</option><option value="DC">DC</option>
+                <option value="FL">FL</option><option value="GA">GA</option><option value="HI">HI</option>
+                <option value="ID">ID</option><option value="IL">IL</option><option value="IN">IN</option>
+                <option value="IA">IA</option><option value="KS">KS</option><option value="KY">KY</option>
+                <option value="LA">LA</option><option value="ME">ME</option><option value="MD">MD</option>
+                <option value="MA">MA</option><option value="MI">MI</option><option value="MN">MN</option>
+                <option value="MS">MS</option><option value="MO">MO</option><option value="MT">MT</option>
+                <option value="NE">NE</option><option value="NV">NV</option><option value="NH">NH</option>
+                <option value="NJ">NJ</option><option value="NM">NM</option><option value="NY">NY</option>
+                <option value="NC">NC</option><option value="ND">ND</option><option value="OH">OH</option>
+                <option value="OK">OK</option><option value="OR">OR</option><option value="PA">PA</option>
+                <option value="RI">RI</option><option value="SC">SC</option><option value="SD">SD</option>
+                <option value="TN">TN</option><option value="TX">TX</option><option value="UT">UT</option>
+                <option value="VT">VT</option><option value="VA">VA</option><option value="WA">WA</option>
+                <option value="WV">WV</option><option value="WI">WI</option><option value="WY">WY</option>
+              </select>
+            </div>
+
+            <div class="col-md-3">
+              <label for="zipcode" class="form-label">Zip Code <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" id="zipcode" name="zipcode" maxlength="9" pattern="\d{5}(-?\d{4})?" required>
+              <div class="form-text">Enter 5-digit or 9-digit ZIP (with or without hyphen).</div>
+            </div>
+
+            <div class="col-12">
+              <label for="skills" class="form-label">Skills <span class="text-danger">*</span></label>
+              <select class="form-select" id="skills" name="skills" multiple required>
+                <option value="first_aid">First Aid</option>
+                <option value="teaching">Teaching</option>
+                <option value="logistics">Logistics</option>
+                <option value="cooking">Cooking</option>
+                <option value="it_support">IT Support</option>
+                <option value="translation">Translation</option>
+                <option value="childcare">Childcare</option>
+                <option value="elderly_care">Elderly Care</option>
+                <option value="pet_care">Pet Care</option>
+                <option value="public_speaking">Public Speaking</option>
+                <option value="graphic_design">Graphic Design</option>
+              </select>
+              <div class="form-text">Hold Command (⌘) on Mac or Ctrl on Windows to select multiple.</div>
+            </div>
+
+            <div class="col-12">
+              <label for="preferences" class="form-label">Preferences</label>
+              <textarea class="form-control" id="preferences" name="preferences" rows="3" placeholder="Anything we should know? (optional)"></textarea>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label">Availability (select one or more dates) <span class="text-danger">*</span></label>
+              <div id="availability-list" class="d-flex flex-column gap-2 mb-2"></div>
+              <div class="d-flex gap-2">
+                <input type="date" id="availability-picker" class="form-control" style="max-width: 240px;">
+                <button type="button" id="add-date" class="btn btn-outline-primary">Add date</button>
+              </div>
+              <!-- hidden inputs for submitted dates will appear here -->
+              <div id="availability-inputs"></div>
+              <div class="form-text">Click "Add date" to add multiple dates. Remove any by clicking the × badge.</div>
+            </div>
+
+          </div>
+
+          <div class="d-flex justify-content-end gap-2 mt-4">
+            <a href="{% url 'home' %}" class="btn btn-outline-secondary">Cancel</a>
+            <button type="submit" class="btn btn-primary">Save Profile</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  const picker = document.getElementById('availability-picker');
+  const addBtn = document.getElementById('add-date');
+  const list = document.getElementById('availability-list');
+  const inputs = document.getElementById('availability-inputs');
+
+  function addDate(dateStr) {
+    if (!dateStr) return;
+    // prevent duplicates
+    const existing = Array.from(inputs.querySelectorAll('input[name="availability[]"]'))
+                          .map(i => i.value);
+    if (existing.includes(dateStr)) return;
+
+    const badge = document.createElement('div');
+    badge.className = 'd-inline-flex align-items-center gap-2 badge bg-secondary-subtle text-secondary-emphasis border';
+    badge.style.width = 'fit-content';
+    badge.innerHTML = '<span class="px-2 py-2">' + dateStr + '</span>';
+
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'btn btn-sm btn-link text-danger text-decoration-none';
+    remove.setAttribute('aria-label', 'Remove date ' + dateStr);
+    remove.textContent = '×';
+
+    remove.addEventListener('click', function() {
+      badge.remove();
+      const hidden = inputs.querySelector('input[name="availability[]"][value="' + dateStr + '"]');
+      if (hidden) hidden.remove();
+    });
+
+    badge.appendChild(remove);
+    list.appendChild(badge);
+
+    const hidden = document.createElement('input');
+    hidden.type = 'hidden';
+    hidden.name = 'availability[]';
+    hidden.value = dateStr;
+    inputs.appendChild(hidden);
+  }
+
+  addBtn?.addEventListener('click', function() {
+    if (picker && picker.value) {
+      addDate(picker.value);
+      picker.value = '';
+    }
+  });
+})();
+</script>
+{% endblock %}
