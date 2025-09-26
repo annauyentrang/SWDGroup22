@@ -121,7 +121,23 @@ STATIC_URL = "static/"
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
-
+"""
 TEMPLATES[0]["OPTIONS"]["context_processors"] += [
     "volunteers_r_us.context_processors.notifications_ctx",
+]
+"""
+TEMPLATES = [
+    {
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [],
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
+                "volunteers_r_us.context_processors.notifications",
+            ],
+        },
+    },
 ]
