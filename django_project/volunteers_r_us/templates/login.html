@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% block title %}Login • VolunteerHub{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-6 col-lg-5">
+    <div class="p-4 p-md-5 bg-white border rounded-3">
+      <h1 class="h4 mb-3">Login</h1>
+      {% if info %}
+        <div class="alert alert-info">{{ info }}</div>
+      {% endif %}
+      <form method="post" novalidate>
+        {% csrf_token %}
+        <div class="mb-3">
+          <label for="email" class="form-label">Email</label>
+          <input id="email" name="email" type="email" class="form-control" placeholder="you@example.org" required maxlength="254">
+          <div class="form-text">Use the email you registered with.</div>
+        </div>
+        <div class="mb-3">
+          <label for="password" class="form-label">Password</label>
+          <input id="password" name="password" type="password" class="form-control" placeholder="••••••••" required minlength="8" maxlength="128">
+        </div>
+        <div class="d-grid">
+          <button type="submit" class="btn btn-primary">Sign In</button>
+        </div>
+      </form>
+      <hr class="my-4">
+      <p class="mb-0">New here? <a href="{% url 'register' %}">Create an account</a>.</p>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,288 @@
+{% extends "base.html" %}
+{% block title %}Volunteer History · VolunteersRUs{% endblock %}
+
+{% block extra_css %}
+<style>
+  .page-title { font-weight:800; letter-spacing:.2px; }
+  .card-soft { border:1px solid #eef0f4; border-radius:1rem; box-shadow:0 2px 10px rgba(17,24,39,.04); background:#fff; }
+  .chip { display:inline-block; padding:.15rem .5rem; border-radius:999px; background:#eef2ff; color:#3730a3; font-size:.8rem; margin-right:.25rem; }
+  .table thead th { white-space:nowrap; }
+  .table thead { position:sticky; top:0; background:#fff; z-index:1; }
+  .help { font-size:.85rem; color:#6b7280; }
+
+  /* Center table */
+  .table-wrap {
+    display: flex;
+    justify-content: center;
+    overflow-x: auto;
+  }
+  .table {
+    width: auto; /* shrink to fit content */
+    margin: 0 auto;
+  }
+
+  /* Footer actions */
+  .table-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: .5rem;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="row justify-content-center">
+    <div class="col-lg-10">
+      <div class="d-flex align-items-center justify-content-between mb-2">
+        <h1 class="page-title mb-0">Volunteer History</h1>
+        <button class="btn btn-outline-primary btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#addEditModal">
+          Add / Edit Participation
+        </button>
+      </div>
+      <p class="text-secondary">Tabular display of all participation history. Includes all Event Management fields and participation status.</p>
+      <!-- Filters -->
+      <section class="card-soft p-3 p-md-4 mb-4">
+        <form class="row g-3 align-items-end" id="filterForm" novalidate>
+          <div class="col-sm-5">
+            <label for="volunteer" class="form-label">Volunteer</label>
+            <select id="volunteer" class="form-select" aria-describedby="volHelp">
+              <option value="">Any</option>
+              <option value="1">Nareh Hovhanesian (ID 1)</option>
+              <option value="2">Katia Qahwajian (ID 2)</option>
+              <option value="3">Simon Zhamkochyan (ID 3)</option>
+              <option value="4">Angelina Samsonyan (ID 4)</option>
+            </select>
+            <div id="volHelp" class="help">Choose a specific volunteer or leave as “Any”.</div>
+          </div>
+          <div class="col-sm-3">
+            <label for="fromDate" class="form-label">From</label>
+            <input id="fromDate" type="date" class="form-control" aria-describedby="dateHelp">
+          </div>
+          <div class="col-sm-3">
+            <label for="toDate" class="form-label">To</label>
+            <input id="toDate" type="date" class="form-control" aria-describedby="dateHelp">
+            <div class="invalid-feedback">“To” date must be on/after “From”.</div>
+          </div>
+          <div class="col-sm-3">
+            <label for="status" class="form-label">Status</label>
+            <select id="status" class="form-select">
+              <option value="">Any</option>
+              <option>Registered</option>
+              <option>Attended</option>
+              <option>No-Show</option>
+              <option>Cancelled</option>
+            </select>
+          </div>
+          <div class="col-12">
+            <div id="dateHelp" class="help">Date range is optional; if set, results must fall within it.</div>
+          </div>
+          <div class="col-12 d-flex gap-2">
+            <button class="btn btn-primary" type="button" id="applyBtn">Apply Filters</button>
+            <button class="btn btn-outline-secondary" type="reset" id="resetFilters">Reset</button>
+          </div>
+        </form>
+      </section>
+
+      <!-- History Table -->
+      <section class="card-soft p-0">
+        <div class="table-wrap" style="max-height:60vh;">
+          <table class="table align-middle mb-0" id="historyTable">
+            <thead class="border-bottom">
+              <tr>
+                <th>Volunteer</th>
+                <th>Event Name</th>
+                <th>Description</th>
+                <th>Location</th>
+                <th>Required Skills</th>
+                <th>Urgency</th>
+                <th>Event Date</th>
+                <th>Capacity</th>
+                <th>Languages</th>
+                <th>Participation Status</th>
+              </tr>
+            </thead>
+            <tbody id="historyBody">
+              <!-- demo rows with data-* used by filters -->
+              <tr data-volunteer="1" data-status="Registered" data-date="2025-09-28">
+                <td>Nareh Hovhanesian</td>
+                <td>Park Cleanup</td>
+                <td>Neighborhood park litter &amp; brush removal.</td>
+                <td>Memorial Park, Houston TX</td>
+                <td><span class="chip">Lifting</span><span class="chip">Driving</span></td>
+                <td><span class="badge rounded-pill text-bg-warning">High</span></td>
+                <td>2025-09-28</td>
+                <td>0 / 25</td>
+                <td><span class="chip">English</span><span class="chip">Vietnamese</span></td>
+                <td><span class="badge rounded-pill bg-secondary">Registered</span></td>
+              </tr>
+              <tr data-volunteer="2" data-status="Attended" data-date="2025-10-05">
+                <td>Katia Qahwajian</td>
+                <td>Blood Donation Desk</td>
+                <td>Check-in and refreshments table.</td>
+                <td>Community Center, Suite B</td>
+                <td><span class="chip">Customer Service</span><span class="chip">Organization</span></td>
+                <td><span class="badge rounded-pill text-bg-info">Medium</span></td>
+                <td>2025-10-05</td>
+                <td>12 / 15</td>
+                <td><span class="chip">English</span></td>
+                <td><span class="badge rounded-pill text-bg-success">Attended</span></td>
+              </tr>
+              <tr data-volunteer="1" data-status="No-Show" data-date="2025-10-19">
+                <td>Simon Zhamkochyan</td>
+                <td>Food Drive Sorting</td>
+                <td>Sort non-perishables; label and stock shelves.</td>
+                <td>St. Mary’s Hall</td>
+                <td><span class="chip">Lifting</span><span class="chip">Inventory</span></td>
+                <td><span class="badge rounded-pill text-bg-secondary">Low</span></td>
+                <td>2025-10-19</td>
+                <td>30 / 40</td>
+                <td><span class="chip">English</span><span class="chip">Spanish</span></td>
+                <td><span class="badge rounded-pill text-bg-danger">No-Show</span></td>
+              </tr>
+              <tr data-volunteer="3" data-status="Cancelled" data-date="2025-10-22">
+                <td>Angelina Samsonyan</td>
+                <td>Shelter Meal Prep</td>
+                <td>Prep and package warm meals for families.</td>
+                <td>Hope Shelter Kitchen</td>
+                <td><span class="chip">Cooking</span><span class="chip">Organization</span></td>
+                <td><span class="badge rounded-pill text-bg-warning">High</span></td>
+                <td>2025-10-22</td>
+                <td>8 / 12</td>
+                <td><span class="chip">English</span></td>
+                <td><span class="badge rounded-pill text-bg-dark">Cancelled</span></td>
+              </tr>
+
+              <!-- No results row -->
+              <tr id="noRows" class="d-none">
+                <td colspan="10" class="text-center text-secondary py-4">No results match your filters.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="p-3 border-top d-flex justify-content-between align-items-center">
+            <div class="text-secondary small" id="resultCount">Showing 4 of 4</div>
+                <div class="d-flex gap-2 ms-auto">
+                    <button class="btn btn-outline-secondary btn-sm" type="button" id="exportCsvBtn">Export CSV</button>
+                    <button class="btn btn-outline-secondary btn-sm" type="button" onclick="window.print()">Print</button>
+      </div>
+      </section>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const $  = (s, r=document) => r.querySelector(s);
+  const $$ = (s, r=document) => Array.from(r.querySelectorAll(s));
+
+  // FILTERS
+  const volunteer = $('#volunteer');
+  const fromDate  = $('#fromDate');
+  const toDate    = $('#toDate');
+  const statusSel = $('#status');
+  const applyBtn  = $('#applyBtn');
+  const resetBtn  = $('#resetFilters');
+
+  const rows      = $$('#historyBody tr');
+  const resultCnt = $('#resultCount');
+  const noRows    = $('#noRows');
+
+  function parseDate(s){ if(!s) return null; const [y,m,d]=s.split('-').map(Number); const dt=new Date(y,m-1,d); return isNaN(dt)?null:dt; }
+  function inRange(ds, fs, ts){
+    const d=parseDate(ds); if(!d) return false;
+    const f=fs?parseDate(fs):null, t=ts?parseDate(ts):null;
+    if (f && d < f) return false;
+    if (t) { const end=new Date(t.getFullYear(), t.getMonth(), t.getDate(), 23,59,59,999); if (d > end) return false; }
+    return true;
+  }
+  function validateDateRange(){
+    const f=parseDate(fromDate.value||'');
+    const t=parseDate(toDate.value||'');
+    if (f && t && t < f) { toDate.classList.add('is-invalid'); return false; }
+    toDate.classList.remove('is-invalid'); return true;
+  }
+  function applyFilters(){
+    if (!validateDateRange()) return;
+
+    const v=(volunteer.value||'').trim();
+    const s=(statusSel.value||'').trim();
+    const f=(fromDate.value||'').trim();
+    const t=(toDate.value||'').trim();
+
+    let shown=0, total=rows.length - 1; // subtract noRows row (present but hidden)
+    rows.forEach(tr=>{
+      if (tr.id === 'noRows') return;
+      const rv=tr.dataset.volunteer||'';
+      const rs=tr.dataset.status||'';
+      const rd=tr.dataset.date||'';
+      const keepV = !v || rv===v;
+      const keepS = !s || rs===s;
+      const keepD = !(f||t) || inRange(rd,f,t);
+      const vis = keepV && keepS && keepD;
+      tr.style.display = vis ? '' : 'none';
+      if (vis) shown++;
+    });
+    resultCnt.textContent = `Showing ${shown} of ${total}`;
+    noRows.classList.toggle('d-none', shown !== 0);
+  }
+  // bind
+  applyBtn?.addEventListener('click', applyFilters);
+  volunteer?.addEventListener('change', applyFilters);
+  statusSel?.addEventListener('change', applyFilters);
+  fromDate?.addEventListener('input', applyFilters);
+  toDate?.addEventListener('input', applyFilters);
+  resetBtn?.addEventListener('click', ()=>setTimeout(()=>{ 
+    rows.forEach(tr=>{ if(tr.id!=='noRows') tr.style.display=''; });
+    resultCnt.textContent = `Showing ${rows.length-1} of ${rows.length-1}`;
+    noRows.classList.add('d-none');
+    toDate.classList.remove('is-invalid');
+  },0));
+  // initial
+  resultCnt.textContent = `Showing ${rows.length-1} of ${rows.length-1}`;
+
+  // FORM VALIDATION (Event Management fields)
+  const partForm = $('#participationForm');
+  if (partForm) {
+    partForm.addEventListener('submit', function (e) {
+      // custom: at least one skill
+      const skills = $('#skills');
+      if (skills && [...skills.options].filter(o => o.selected).length === 0) {
+        skills.setCustomValidity('Select at least one skill.');
+      } else if (skills) {
+        skills.setCustomValidity('');
+      }
+      if (!partForm.checkValidity()) { e.preventDefault(); e.stopPropagation(); partForm.classList.add('was-validated'); return; }
+      // mock "save": close and reset
+      e.preventDefault();
+      const modalEl = $('#addEditModal');
+      const modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+      modal.hide();
+      partForm.reset();
+      partForm.classList.remove('was-validated');
+    });
+  }
+
+  // EXPORT CSV of visible rows
+  $('#exportCsvBtn')?.addEventListener('click', () => {
+    const headers = $$('#historyTable thead th').map(th => th.textContent.trim());
+    const visibleRows = $$('#historyBody tr').filter(tr => tr.id !== 'noRows' && tr.style.display !== 'none');
+    const data = visibleRows.map(tr => Array.from(tr.children).map(td => {
+      const text = td.textContent.trim().replace(/\s+/g,' ');
+      return '"' + text.replace(/"/g,'""') + '"';
+    }));
+    const csv = [headers.map(h=>`"${h.replace(/"/g,'""')}"`).join(',')]
+      .concat(data.map(row => row.join(',')))
+      .join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'volunteer_history.csv';
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  });
+});
+</script>
+{% endblock %}
