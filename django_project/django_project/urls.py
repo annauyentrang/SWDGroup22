@@ -23,5 +23,5 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("volunteers_r_us/", include('volunteers_r_us.urls')),
     path("", RedirectView.as_view(url="/volunteers_r_us/", permanent=False)),
-    path("api/", include("matching.api_urls")),  # exposes /api/events, /api/match, etc.
+    path("api/", include("volunteers_r_us.matching.api_urls"))
 ]

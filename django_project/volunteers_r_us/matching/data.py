@@ -2,7 +2,7 @@ from .domain import Volunteer, Event
 
 VOLUNTEERS = [
     Volunteer(
-        1,"Alice Nguyen",
+        1,"Allie Nguyen",
         {"Spanish","CPR"},
         {"English","Spanish"},
         {"sat_am","sun_pm"},

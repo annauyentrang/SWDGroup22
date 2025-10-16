@@ -2,7 +2,8 @@ from django.shortcuts import render, redirect
 from django.http import HttpResponse
 from django.contrib.auth import get_user_model
 from .models import Notification
-from datetime import date
+
+from datetime import datetime, date
 
 def home(request):
     return render(request, 'home.html')
@@ -26,35 +27,40 @@ from django.shortcuts import render
 from django.shortcuts import render
 from .models import Notification
 
-def home(request):
-    return render(request, "home.html")
+from volunteers_r_us.matching.data import VOLUNTEERS as VDATA, EVENTS as EDATA
+from volunteers_r_us.matching.logic import score, volunteer_to_dict, event_to_dict
 
-def login_view(request):
-    return render(request, "login.html")
-
-def register(request):
-    return render(request, "register.html")
 
 def match_volunteer(request):
-    volunteers = [
-        {"id": 1, "name": "Alice Nguyen", "skills": ["Spanish", "CPR"],
-         "languages": ["English", "Spanish"], "availability": ["sat_am", "sun_pm"],
-         "location_radius_miles": 10, "certifications": ["CPR"], "constraints": ["No heavy lifting"]},
-        {"id": 2, "name": "Bob Tran", "skills": ["Driving", "Lifting"],
-         "languages": ["English", "Vietnamese"], "availability": ["sun_pm"],
-         "location_radius_miles": 15, "certifications": ["Background Check"], "constraints": []},
-    ]
-    events = [
-        {"id": 1, "title": "Food Drive", "required_skills": ["Food handling", "Spanish"],
-         "nice_skills": ["Driving"], "slot": "sat_am", "date": "2025-09-27 09:00",
-         "location": "Downtown Pantry", "capacity_remaining": 5, "min_age": 16, "bg_check": True},
-        {"id": 2, "title": "Park Cleanup", "required_skills": ["Lifting"],
-         "nice_skills": [], "slot": "sun_pm", "date": "2025-09-28 14:00",
-         "location": "Memorial Park", "capacity_remaining": 0, "min_age": 14, "bg_check": False},
-        {"id": 3, "title": "Blood Donation Desk", "required_skills": ["Customer service"],
-         "nice_skills": ["CPR"], "slot": "sat_am", "date": "2025-09-27 09:00",
-         "location": "City Hall", "capacity_remaining": 2, "min_age": 18, "bg_check": False},
-    ]
+    # map backend dataclasses -> the fields your template expects
+    def _slot_from_timeblocks(tb): return next(iter(tb), "")
+    def _vol_to_view(v):
+        return {
+            "id": v.id,
+            "name": v.name,
+            "skills": sorted(v.skills),
+            "languages": sorted(v.languages),
+            "availability": sorted(v.availability),
+            "location_radius_miles": v.radius_miles,
+            "certifications": sorted(v.certifications),
+            "constraints": sorted(v.constraints),
+        }
+    def _event_to_view(e):
+        return {
+            "id": e.id,
+            "title": e.title,
+            "required_skills": sorted(e.required_skills),
+            "nice_skills": [],                     # stub
+            "slot": _slot_from_timeblocks(e.time_blocks),
+            "date": "TBD",                         # stub
+            "location": "TBD",                     # stub
+            "capacity_remaining": 5,               # stub
+            "min_age": 0,                          # stub
+            "bg_check": False,                     # stub
+        }
+
+    volunteers = [_vol_to_view(v) for v in VDATA]
+    events = [_event_to_view(e) for e in EDATA]
 
     sel_vid = request.GET.get("volunteer_id") or request.POST.get("volunteer_id") or str(volunteers[0]["id"])
     volunteer = next(v for v in volunteers if str(v["id"]) == str(sel_vid))
@@ -82,11 +88,9 @@ def match_volunteer(request):
     match_reason = f"{len(overlap)} skill match; time fit={time_fit}"
 
     saved, errors = None, []
-
     if request.method == "POST":
-        if request.POST.get("override") == "on" and not request.POST.get("override_reason", "").strip():
+        if request.POST.get("override") == "on" and not (request.POST.get("override_reason") or "").strip():
             errors.append("Override reason is required when override is checked.")
-
         if not errors:
             saved = {
                 "volunteer_id": volunteer["id"],
@@ -100,14 +104,13 @@ def match_volunteer(request):
                 "match_reason": match_reason,
                 "warnings": warnings,
             }
-
-            # create notification only on POST, only if authenticated
-            if request.user.is_authenticated:
-                Notification.objects.create(
-                    user=request.user,
-                    message=f"Assigned {volunteer['name']} to {selected['title']}",
-                    url=request.path,  # safe default
-                )
+            # Notification Model
+            # if request.user.is_authenticated:
+            #     Notification.objects.create(
+            #         user=request.user,
+            #         message=f"Assigned {volunteer['name']} to {selected['title']}",
+            #         url=request.path,
+            #     )
 
     ctx = {
         "volunteers": volunteers, "volunteer": volunteer, "events": events,

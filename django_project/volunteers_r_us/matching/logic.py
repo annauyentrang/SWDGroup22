@@ -1,6 +1,30 @@
 from typing import List, Tuple
 from .domain import Volunteer, Event
 
+def volunteer_to_dict(v: Volunteer):
+    return {
+        "id": v.id,
+        "name": v.name,
+        "skills": sorted(v.skills),
+        "languages": sorted(v.languages),
+        "availability": sorted(v.availability),
+        "radius_miles": v.radius_miles,
+        "certifications": sorted(v.certifications),
+        "constraints": sorted(v.constraints),
+    }
+
+def event_to_dict(e: Event):
+    return {
+        "id": e.id,
+        "title": e.title,
+        "required_skills": sorted(e.required_skills),
+        "languages": sorted(e.languages),
+        "slots": e.slots,
+        "time_blocks": sorted(e.time_blocks),
+        "max_radius_miles": e.max_radius_miles,
+        "requires": sorted(e.requires),
+    }
+
 def score(vol: Volunteer, ev: Event) -> int:
     s = 0
     s += len(vol.skills & ev.required_skills) * 3
