@@ -4,11 +4,12 @@ from django.shortcuts import render
 import json
 from django.http import JsonResponse, HttpResponseBadRequest
 from django.views.decorators.http import require_http_methods
-from django.views.decorators.csrf import csrf_exempt  # dev-only
+from django.views.decorators.csrf import csrf_exempt
+
 from .data import VOLUNTEERS, EVENTS
+from .logic import matches_event, match_volunteers, volunteer_to_dict, event_to_dict
 from .forms import VolunteerForm, EventForm
-from .domain import Event
-from .logic import volunteer_to_dict, event_to_dict, score, match_volunteers
+from .domain import Event  # if you really need this class; otherwise keep events as dicts
 
 @require_http_methods(["GET"])
 def volunteers_api(_request):
@@ -40,20 +41,16 @@ def validate_event(request):
 @require_http_methods(["POST"])
 def match_api(request):
     data = json.loads(request.body or "{}")
+
     if "event_id" in data:
-        ev = next((e for e in EVENTS if e.id == data["event_id"]), None)
+        ev = next((e for e in EVENTS if e.get("id")==data["event_id"]), None)
         if not ev:
             return HttpResponseBadRequest("Unknown event_id")
     else:
         f = EventForm(data)
         if not f.is_valid():
             return JsonResponse({"ok": False, "errors": f.errors}, status=400)
-        cd = f.cleaned_data
-        ev = Event(
-            cd["id"], cd["title"], set(cd["required_skills"]), set(cd["languages"]),
-            cd["slots"], set(cd["time_blocks"]), cd["max_radius_miles"],
-            set(cd.get("requires", [])),
-        )
+        ev = f.cleaned_data  # keep as dict
 
     ranked = match_volunteers(VOLUNTEERS, ev)
     return JsonResponse({

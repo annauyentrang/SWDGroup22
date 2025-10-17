@@ -1,7 +1,7 @@
 from django import forms
 
 SKILL_CHOICES = ["CPR","Driving","Lifting","Spanish","FirstAid"]
-LANG_CHOICES  = ["English","Spanish","Vietnamese"]
+LANG_CHOICES  = ["English","Spanish","Vietnamese","Spanish","German"]
 TIME_CHOICES  = ["sat_am","sat_pm","sun_am","sun_pm"]
 
 def _as_set(cleaned, key):  # helper

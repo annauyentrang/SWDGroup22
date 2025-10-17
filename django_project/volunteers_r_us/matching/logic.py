@@ -1,43 +1,70 @@
-from typing import List, Tuple
-from .domain import Volunteer, Event
+# volunteers_r_us/matching/logic.py
+from math import hypot
+from datetime import datetime
 
-def volunteer_to_dict(v: Volunteer):
-    return {
-        "id": v.id,
-        "name": v.name,
-        "skills": sorted(v.skills),
-        "languages": sorted(v.languages),
-        "availability": sorted(v.availability),
-        "radius_miles": v.radius_miles,
-        "certifications": sorted(v.certifications),
-        "constraints": sorted(v.constraints),
-    }
+def _val(obj, key, default=None):
+    if isinstance(obj, dict):
+        return obj.get(key, default)
+    return getattr(obj, key, default)
 
-def event_to_dict(e: Event):
-    return {
-        "id": e.id,
-        "title": e.title,
-        "required_skills": sorted(e.required_skills),
-        "languages": sorted(e.languages),
-        "slots": e.slots,
-        "time_blocks": sorted(e.time_blocks),
-        "max_radius_miles": e.max_radius_miles,
-        "requires": sorted(e.requires),
-    }
+def _to_dt(x):
+    return x if isinstance(x, datetime) else datetime.fromisoformat(x)
 
-def score(vol: Volunteer, ev: Event) -> int:
+def time_overlap(a, b):
+    a0, a1 = _to_dt(a["start"]), _to_dt(a["end"])
+    b0, b1 = _to_dt(b["start"]), _to_dt(b["end"])
+    return not (a1 <= b0 or b1 <= a0)
+
+def matches_event(v, e):
+    if not set(_val(e, "required_skills", []))\
+            .issubset(set(_val(v, "skills", []))):
+        return False
+    langs = _val(e, "languages", [])
+    if langs and not (set(langs) & set(_val(v, "languages", []))):
+        return False
+    if _val(e, "slots", 1) <= 0:
+        return False
+    r = _val(e, "max_radius_miles", None)
+    if r is not None:
+        V = _val(v, "location", {"lat": 0.0, "lng": 0.0})
+        E = _val(e, "location", {"lat": 0.0, "lng": 0.0})
+        if hypot(V["lat"] - E["lat"], V["lng"] - E["lng"]) >= r:
+            return False
+    tbs = _val(e, "time_blocks", [])
+    if tbs:
+        av = _val(v, "availability", [])
+        if not any(time_overlap(tb, a) for tb in tbs for a in av):
+            return False
+    return True
+
+def score(v, e):
     s = 0
-    s += len(vol.skills & ev.required_skills) * 3
-    s += len(vol.languages & ev.languages) * 2
-    s += 2 if len(vol.availability & ev.time_blocks) else 0
-    s += 1 if vol.radius_miles <= ev.max_radius_miles else -5
-    if ev.requires - vol.certifications:
-        s -= 100  # hard fail
-    if "No heavy lifting" in vol.constraints and "Lifting" in ev.required_skills:
-        s -= 100  # hard fail
-    return s
+    s += len(set(_val(e, "required_skills", [])) & set(_val(v, "skills", [])))
+    s += len(set(_val(e, "languages", [])) & set(_val(v, "languages", [])))
+    return float(s)
 
-def match_volunteers(vols: List[Volunteer], ev: Event, k: int=None) -> List[Tuple[Volunteer,int]]:
-    ranked = sorted(((v, score(v, ev)) for v in vols), key=lambda x: x[1], reverse=True)
-    ranked = [pair for pair in ranked if pair[1] > 0]
-    return ranked[: (k or ev.slots)]
+def match_volunteers(volunteers, event):
+    elig = [(v, score(v, event)) for v in volunteers if matches_event(v, event)]
+    return sorted(elig, key=lambda t: t[1], reverse=True)
+
+def volunteer_to_dict(v):
+    return {
+        "id": _val(v, "id"),
+        "full_name": _val(v, "full_name") or _val(v, "name"),
+        "skills": list(_val(v, "skills", [])),
+        "languages": list(_val(v, "languages", [])),
+        "location": _val(v, "location", {"lat": 0.0, "lng": 0.0}),
+        "availability": list(_val(v, "availability", [])),
+    }
+
+def event_to_dict(e):
+    return {
+        "id": _val(e, "id"),
+        "title": _val(e, "title"),
+        "required_skills": list(_val(e, "required_skills", [])),
+        "languages": list(_val(e, "languages", [])),
+        "slots": _val(e, "slots", 0),
+        "time_blocks": list(_val(e, "time_blocks", [])),
+        "max_radius_miles": _val(e, "max_radius_miles"),
+        "location": _val(e, "location", {"lat": 0.0, "lng": 0.0}),
+    }
