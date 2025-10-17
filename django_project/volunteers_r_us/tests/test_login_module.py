@@ -6,9 +6,10 @@ coverage html  # optional: opens htmlcov/index.html
 
 """
 
-from django.test import TestCase
+from django.test import TestCase, Client
 from django.urls import reverse
 from django.contrib.auth import get_user_model
+from ..forms import UserProfileForm, EventForm
 
 User = get_user_model()
 
@@ -122,3 +123,106 @@ class LoginModuleTests(TestCase):
         for url in [self.profile_url, self.event_form_url, self.history_url]:
             resp = self.client.get(url)
             self.assertEqual(resp.status_code, 200)
+
+class UserProfileFormTests(TestCase):
+    def test_profile_valid(self):
+        form = UserProfileForm(data={
+            "full_name": "Jane Doe",
+            "address1": "123 Main",
+            "address2": "",
+            "city": "Austin",
+            "state": "TX",
+            "zipcode": "78701",
+            "skills": ["teaching","it_support"],
+            "preferences": "",
+            "availability": "2025-10-16",
+        })
+        form.data.setlist("availability[]", ["2025-10-20","2025-10-21"])
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(len(form.cleaned_data["availability"]), 2)
+
+    def test_profile_invalid_zip(self):
+        form = UserProfileForm(data={
+            "full_name": "x",
+            "address1": "y",
+            "city": "z",
+            "state": "TX",
+            "zipcode": "12-34",
+            "skills": ["teaching"],
+        })
+        form.data.setlist("availability[]", ["2025-10-20"])
+        self.assertFalse(form.is_valid())
+        self.assertIn("zipcode", form.errors)
+
+    def test_profile_missing_availability(self):
+        form = UserProfileForm(data={
+            "full_name": "x",
+            "address1": "y",
+            "city": "z",
+            "state": "TX",
+            "zipcode": "78701",
+            "skills": ["teaching"],
+        })
+        self.assertFalse(form.is_valid())
+        self.assertIn("availability", form.errors)
+
+class EventFormTests(TestCase):
+    def test_event_valid(self):
+        form = EventForm(data={
+            "event_name": "Food Drive",
+            "event_description": "Collect cans",
+            "location": "Community Center",
+            "required_skills": ["event_support","driving"],
+            "urgency": "high",
+            "event_date": "2025-10-20",
+        })
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_event_missing_fields(self):
+        form = EventForm(data={"event_name": ""})
+        self.assertFalse(form.is_valid())
+        self.assertIn("event_name", form.errors)
+
+class ViewIntegrationTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+
+    def test_profile_get(self):
+        resp = self.client.get(reverse("profile_form"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Complete Your Profile")
+
+    def test_profile_post_success(self):
+        data = {
+            "full_name": "Jane Doe",
+            "address1": "123 Main",
+            "address2": "",
+            "city": "Austin",
+            "state": "TX",
+            "zipcode": "78701",
+            "skills": ["teaching","it_support"],
+            "preferences": "",
+        }
+        avail = [("availability[]", "2025-10-20"), ("availability[]", "2025-10-21")]
+        resp = self.client.post(reverse("profile_form"), data=list(data.items()) + avail, follow=True)
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("last_profile", self.client.session)
+
+    def test_event_get(self):
+        resp = self.client.get(reverse("event_form"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Event Management")
+
+    def test_event_post_success(self):
+        data = {
+            "event_name": "Food Drive",
+            "event_description": "Collect cans",
+            "location": "Community Center",
+            "required_skills": ["event_support","driving"],
+            "urgency": "high",
+            "event_date": "2025-10-20",
+        }
+        resp = self.client.post(reverse("event_form"), data, follow=True)
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("events", self.client.session)
+        self.assertGreaterEqual(len(self.client.session["events"]), 1)

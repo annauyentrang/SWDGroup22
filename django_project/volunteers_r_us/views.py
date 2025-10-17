@@ -11,6 +11,8 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required, user_passes_test
+from django.contrib import messages
+from .forms import UserProfileForm, EventForm, STATE_CHOICES, SKILL_CHOICES, URGENCY_CHOICES
 
 User = get_user_model()
 
@@ -277,3 +279,47 @@ def volunteer_history(request):
         },
     )
 
+def profile_form(request):
+    if request.method == "POST":
+        form = UserProfileForm(request.POST)
+        if form.is_valid():
+            cleaned = form.cleaned_data.copy()
+            cleaned["availability"] = [d.isoformat() for d in cleaned["availability"]]
+            # Persist later via DB; for now store in session
+            request.session["last_profile"] = cleaned
+            messages.success(request, "Profile saved (validated on backend).")
+            return redirect("profile_form")
+        messages.error(request, "Please fix the errors below.")
+    else:
+        initial = request.session.get("last_profile")
+        form = UserProfileForm(initial=initial)
+
+    selected_state = (request.POST.get("state")
+                      if request.method == "POST"
+                      else (form.initial or {}).get("state"))
+    selected_skills = set(request.POST.getlist("skills")) if request.method == "POST" \
+                      else set((form.initial or {}).get("skills", []))
+
+
+    ctx = {"form": form, "STATE_CHOICES": STATE_CHOICES, "SKILL_CHOICES": SKILL_CHOICES, "selected_state": selected_state,
+        "selected_skills": selected_skills,}
+    return render(request, "profile_form.html", ctx)
+
+def event_form(request):
+    if request.method == "POST":
+        form = EventForm(request.POST)
+        if form.is_valid():
+            cleaned = form.cleaned_data.copy()
+            request.session.setdefault("events", [])
+            request.session["events"] = request.session["events"] + [cleaned]
+            messages.success(request, "Event created (validated on backend).")
+            return redirect("event_form")
+        messages.error(request, "Please fix the errors below.")
+    else:
+        form = EventForm()
+    
+    selected_required_skills = set(request.POST.getlist("required_skills")) if request.method == "POST" else set()
+    selected_urgency = request.POST.get("urgency") if request.method == "POST" else None
+
+    ctx = {"form": form, "SKILL_CHOICES": SKILL_CHOICES, "URGENCY_CHOICES": URGENCY_CHOICES, "selected_required_skills": selected_required_skills, "selected_urgency": selected_urgency,}
+    return render(request, "event_form.html", ctx)
