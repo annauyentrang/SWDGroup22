@@ -34,18 +34,13 @@
             <div class="col-12">
               <label for="required_skills" class="form-label">Required Skills <span class="text-danger">*</span></label>
               <select class="form-select" id="required_skills" name="required_skills" multiple required>
-                <option value="first_aid">First Aid</option>
-                <option value="teaching">Teaching</option>
-                <option value="logistics">Logistics</option>
-                <option value="cooking">Cooking</option>
-                <option value="it_support">IT Support</option>
-                <option value="translation">Translation</option>
-                <option value="childcare">Childcare</option>
-                <option value="elderly_care">Elderly Care</option>
-                <option value="pet_care">Pet Care</option>
-                <option value="public_speaking">Public Speaking</option>
-                <option value="graphic_design">Graphic Design</option>
+                {% for code,label in SKILL_CHOICES %}
+                  <option value="{{ code }}" {% if code in selected_required_skills %}selected{% endif %}>
+                    {{ label }}
+                  </option>
+                {% endfor %}
               </select>
+
               <div class="form-text">Hold Command (⌘) on Mac or Ctrl on Windows to select multiple.</div>
             </div>
 
@@ -53,11 +48,14 @@
               <label for="urgency" class="form-label">Urgency <span class="text-danger">*</span></label>
               <select class="form-select" id="urgency" name="urgency" required>
                 <option value="">Choose...</option>
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-                <option value="critical">Critical</option>
+                {% for code,label in URGENCY_CHOICES %}
+                  <option value="{{ code }}" {% if code == selected_urgency %}selected{% endif %}>
+                    {{ label }}
+                  </option>
+                {% endfor %}
               </select>
+
+
             </div>
 
             <div class="col-md-6">
