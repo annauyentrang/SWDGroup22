@@ -1,4 +1,3 @@
-# volunteers_r_us/matching/logic.py
 from math import hypot
 from datetime import datetime
 
