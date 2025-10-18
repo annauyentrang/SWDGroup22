@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from django.test import SimpleTestCase
-from volunteers_r_us.matching.logic import time_overlap, matches_event, match_volunteers
+from..matching.logic import time_overlap, matches_event, match_volunteers
 
 class TestLogicBranches(SimpleTestCase):
     def test_time_overlap_none_and_edge(self):

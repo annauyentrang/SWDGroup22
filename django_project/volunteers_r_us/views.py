@@ -96,7 +96,7 @@ def profile_form(request):
 def event_form(request):
     return render(request, "event_form.html")
 
-@login_required
+#@login_required
 # volunteers_r_us/views.py
 from django.shortcuts import render
 
@@ -104,8 +104,8 @@ from django.shortcuts import render
 from django.shortcuts import render
 from .models import Notification
 
-from matching.data import VOLUNTEERS as VDATA, EVENTS as EDATA
-from matching.logic import score, volunteer_to_dict, event_to_dict
+from .matching.data import VOLUNTEERS as VDATA, EVENTS as EDATA
+from .matching.logic import score, volunteer_to_dict, event_to_dict
 
 
 def match_volunteer(request):

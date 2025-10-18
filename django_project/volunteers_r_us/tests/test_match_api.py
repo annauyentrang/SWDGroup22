@@ -1,7 +1,7 @@
 import json
 from django.test import TestCase, RequestFactory
-from volunteers_r_us.matching import views
-from volunteers_r_us.matching.data import EVENTS
+from ..matching import views
+from ..matching.data import EVENTS
 
 class TestMatchAPI(TestCase):
     def setUp(self):
