@@ -40,37 +40,20 @@ def validate_event(request):
 @csrf_exempt
 @require_http_methods(["POST"])
 def match_api(request):
-    try:
-        data = json.loads(request.body or "{}")
-    except json.JSONDecodeError:
-        return HttpResponseBadRequest("Invalid JSON")
+    data = json.loads(request.body or "{}")
 
-    # Resolve event payload -> dict
     if "event_id" in data:
-        # EVENTS may contain objects or dicts
-        ev = next(
-            (
-                e for e in EVENTS
-                if (getattr(e, "id", None) == data["event_id"])
-                or (isinstance(e, dict) and e.get("id") == data["event_id"])
-            ),
-            None,
-        )
-        if ev is None:
+        ev = next((e for e in EVENTS if e.get("id")==data["event_id"]), None)
+        if not ev:
             return HttpResponseBadRequest("Unknown event_id")
-        ev_dict = event_to_dict(ev)  # normalize for matching + response
     else:
         f = EventForm(data)
         if not f.is_valid():
             return JsonResponse({"ok": False, "errors": f.errors}, status=400)
-        ev_dict = f.cleaned_data
+        ev = f.cleaned_data  # keep as dict
 
-    ranked = match_volunteers(VOLUNTEERS, ev_dict)
-    return JsonResponse(
-        {
-            "event": event_to_dict(ev_dict),
-            "matches": [
-                {"volunteer": volunteer_to_dict(v), "score": s} for v, s in ranked
-            ],
-        }
-    )
+    ranked = match_volunteers(VOLUNTEERS, ev)
+    return JsonResponse({
+        "event": event_to_dict(ev),
+        "matches": [{"volunteer": volunteer_to_dict(v), "score": s} for v, s in ranked],
+    })
