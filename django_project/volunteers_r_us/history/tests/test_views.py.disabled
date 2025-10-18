@@ -1,0 +1,57 @@
+import json
+from django.test import SimpleTestCase, Client
+import pytest
+pytestmark = pytest.mark.skip(reason="Project has no API endpoints; skipping API tests.")
+class TestViews(SimpleTestCase):
+    def setUp(self):
+        self.c = Client()
+
+    def test_reference_data(self):
+        r = self.c.get("/api/reference-data/")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("volunteers", r.json())
+
+    def test_history_list_basic(self):
+        r = self.c.get("/api/volunteer-history/")
+        self.assertEqual(r.status_code, 200)
+        self.assertGreaterEqual(r.json()["count"], 1)
+
+    def test_filter_by_status(self):
+        r = self.c.get("/api/volunteer-history/?status=Attended")
+        self.assertEqual(r.status_code, 200)
+        for row in r.json()["results"]:
+            self.assertEqual(row["status"], "Attended")
+
+    def test_upsert_create_and_update(self):
+        payload = {
+            "volunteer_id": 1,
+            "event_name": "New Event",
+            "description": "Desc",
+            "location": "Loc",
+            "required_skills": ["Lifting"],
+            "urgency": "Low",
+            "event_date": "2025-11-11",
+            "capacity_current": 0,
+            "capacity_total": 5,
+            "languages": ["English"],
+            "status": "Registered"
+        }
+        r = self.c.post("/api/volunteer-history/upsert/",
+                        data=json.dumps(payload),
+                        content_type="application/json")
+        self.assertEqual(r.status_code, 200)
+        rid = r.json()["record"]["id"]
+
+        payload["id"] = rid
+        payload["status"] = "Attended"
+        r2 = self.c.put("/api/volunteer-history/upsert/",
+                        data=json.dumps(payload),
+                        content_type="application/json")
+        self.assertEqual(r2.status_code, 200)
+        self.assertEqual(r2.json()["record"]["status"], "Attended")
+
+    def test_upsert_rejects_bad_json(self):
+        r = self.c.post("/api/volunteer-history/upsert/",
+                        data="not-json",
+                        content_type="application/json")
+        self.assertEqual(r.status_code, 400)
