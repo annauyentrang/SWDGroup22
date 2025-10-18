@@ -9,31 +9,25 @@
   .table thead th { white-space:nowrap; }
   .table thead { position:sticky; top:0; background:#fff; z-index:1; }
   .help { font-size:.85rem; color:#6b7280; }
-
-  /* Center table */
-  .table-wrap {
-    display: flex;
-    justify-content: center;
-    overflow-x: auto;
-  }
-  .table {
-    width: auto; /* shrink to fit content */
-    margin: 0 auto;
-  }
-
-  /* Footer actions */
-  .table-footer {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: .5rem;
-  }
+  .table-wrap { display:flex; justify-content:center; overflow-x:auto; }
+  .table { width:auto; margin:0 auto; }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="container py-4">
+
+  {% if messages %}
+    <div class="mt-2">
+      {% for message in messages %}
+        <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
   <div class="row justify-content-center">
     <div class="col-lg-10">
       <div class="d-flex align-items-center justify-content-between mb-2">
@@ -43,50 +37,67 @@
         </button>
       </div>
       <p class="text-secondary">Tabular display of all participation history. Includes all Event Management fields and participation status.</p>
-      <!-- Filters -->
+
+      <!-- FILTERS -->
       <section class="card-soft p-3 p-md-4 mb-4">
-        <form class="row g-3 align-items-end" id="filterForm" novalidate>
-          <div class="col-sm-5">
+        <form class="row g-3 align-items-end" id="filterForm" method="get" action="">
+          <!-- Volunteer -->
+          <div class="col-sm-4">
             <label for="volunteer" class="form-label">Volunteer</label>
-            <select id="volunteer" class="form-select" aria-describedby="volHelp">
-              <option value="">Any</option>
-              <option value="1">Nareh Hovhanesian (ID 1)</option>
-              <option value="2">Katia Qahwajian (ID 2)</option>
-              <option value="3">Simon Zhamkochyan (ID 3)</option>
-              <option value="4">Angelina Samsonyan (ID 4)</option>
+            <select id="volunteer" name="volunteer" class="form-select" aria-describedby="volHelp">
+              <option value="" {% if not filter.volunteer %}selected{% endif %}>Any</option>
+              {% for v in volunteers %}
+                <option value="{{ v.id }}"
+                        {% if filter.volunteer|stringformat:"s" == v.id|stringformat:"s" %}selected{% endif %}>
+                  {{ v.full_name }} (ID {{ v.id }})
+                </option>
+              {% endfor %}
             </select>
             <div id="volHelp" class="help">Choose a specific volunteer or leave as “Any”.</div>
           </div>
-          <div class="col-sm-3">
-            <label for="fromDate" class="form-label">From</label>
-            <input id="fromDate" type="date" class="form-control" aria-describedby="dateHelp">
+
+          <!-- From date (STICKY VALUE + CORRECT NAME) -->
+          <div class="col-sm-4">
+            <label for="fromDate" class="form-label">From Date</label>
+            <input
+              id="fromDate"
+              name="from_date"
+              type="date"
+              class="form-control"
+              value="{{ filter.from_date }}"
+              autocomplete="off"
+              placeholder="mm/dd/yyyy"
+            >
+            <div class="help">Show participation starting from this date.</div>
           </div>
-          <div class="col-sm-3">
-            <label for="toDate" class="form-label">To</label>
-            <input id="toDate" type="date" class="form-control" aria-describedby="dateHelp">
-            <div class="invalid-feedback">“To” date must be on/after “From”.</div>
-          </div>
-          <div class="col-sm-3">
+
+          <!-- Status -->
+          <div class="col-sm-4">
             <label for="status" class="form-label">Status</label>
-            <select id="status" class="form-select">
-              <option value="">Any</option>
-              <option>Registered</option>
-              <option>Attended</option>
-              <option>No-Show</option>
-              <option>Cancelled</option>
+            <select id="status" name="status" class="form-select">
+              <option value="" {% if not filter.status %}selected{% endif %}>Any</option>
+              {% with fs=filter.status|default:'' %}
+                {% for s in statuses %}
+                  <option value="{{ s }}" {% if fs|lower == s|lower %}selected{% endif %}>{{ s }}</option>
+                {% empty %}
+                  <option>Registered</option>
+                  <option>Attended</option>
+                  <option>No-Show</option>
+                  <option>Cancelled</option>
+                {% endfor %}
+              {% endwith %}
             </select>
           </div>
-          <div class="col-12">
-            <div id="dateHelp" class="help">Date range is optional; if set, results must fall within it.</div>
-          </div>
+
+          <!-- Actions -->
           <div class="col-12 d-flex gap-2">
-            <button class="btn btn-primary" type="button" id="applyBtn">Apply Filters</button>
-            <button class="btn btn-outline-secondary" type="reset" id="resetFilters">Reset</button>
+            <button class="btn btn-primary" type="submit">Apply Filters</button>
+            <a class="btn btn-outline-secondary" href="?reset=1" id="resetFilters">Reset</a>
           </div>
         </form>
       </section>
 
-      <!-- History Table -->
+      <!-- TABLE -->
       <section class="card-soft p-0">
         <div class="table-wrap" style="max-height:60vh;">
           <table class="table align-middle mb-0" id="historyTable">
@@ -105,69 +116,76 @@
               </tr>
             </thead>
             <tbody id="historyBody">
-              <!-- demo rows with data-* used by filters -->
-              <tr data-volunteer="1" data-status="Registered" data-date="2025-09-28">
-                <td>Nareh Hovhanesian</td>
-                <td>Park Cleanup</td>
-                <td>Neighborhood park litter &amp; brush removal.</td>
-                <td>Memorial Park, Houston TX</td>
-                <td><span class="chip">Lifting</span><span class="chip">Driving</span></td>
-                <td><span class="badge rounded-pill text-bg-warning">High</span></td>
-                <td>2025-09-28</td>
-                <td>0 / 25</td>
-                <td><span class="chip">English</span><span class="chip">Vietnamese</span></td>
-                <td><span class="badge rounded-pill bg-secondary">Registered</span></td>
+              {% for r in rows %}
+              <tr
+                data-volunteer="{{ r.volunteer_id }}"
+                data-status="{{ r.status }}"
+                data-date="{% if r.event_date %}{{ r.event_date|date:'Y-m-d' }}{% endif %}"
+              >
+                <td>{{ r.volunteer_name }}</td>
+                <td>{{ r.event_name }}</td>
+                <td>{{ r.description }}</td>
+                <td>{{ r.location }}</td>
+                <td>
+                  {% for s in r.required_skills %}
+                    <span class="chip">{{ s }}</span>
+                  {% endfor %}
+                </td>
+                <td>
+                  {% if r.urgency == "High" %}
+                    <span class="badge rounded-pill text-bg-warning">High</span>
+                  {% elif r.urgency == "Medium" %}
+                    <span class="badge rounded-pill text-bg-info">Medium</span>
+                  {% else %}
+                    <span class="badge rounded-pill text-bg-secondary">Low</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if r.event_date %}
+                    {{ r.event_date|date:"Y-m-d" }}
+                  {% else %}
+                    —
+                  {% endif %}
+                </td>
+                <td>{{ r.capacity }}</td>
+                <td>
+                  {% for lang in r.languages %}
+                    <span class="chip">{{ lang }}</span>
+                  {% endfor %}
+                </td>
+                <td>
+                  {% if r.status == "Registered" %}
+                    <span class="badge rounded-pill bg-secondary">Registered</span>
+                  {% elif r.status == "Attended" %}
+                    <span class="badge rounded-pill text-bg-success">Attended</span>
+                  {% elif r.status == "No-Show" %}
+                    <span class="badge rounded-pill text-bg-danger">No-Show</span>
+                  {% else %}
+                    <span class="badge rounded-pill text-bg-dark">Cancelled</span>
+                  {% endif %}
+                </td>
               </tr>
-              <tr data-volunteer="2" data-status="Attended" data-date="2025-10-05">
-                <td>Katia Qahwajian</td>
-                <td>Blood Donation Desk</td>
-                <td>Check-in and refreshments table.</td>
-                <td>Community Center, Suite B</td>
-                <td><span class="chip">Customer Service</span><span class="chip">Organization</span></td>
-                <td><span class="badge rounded-pill text-bg-info">Medium</span></td>
-                <td>2025-10-05</td>
-                <td>12 / 15</td>
-                <td><span class="chip">English</span></td>
-                <td><span class="badge rounded-pill text-bg-success">Attended</span></td>
+              {% empty %}
+              <tr>
+                <td colspan="10" class="text-center text-secondary py-4">
+                  No results match your filters.
+                </td>
               </tr>
-              <tr data-volunteer="1" data-status="No-Show" data-date="2025-10-19">
-                <td>Simon Zhamkochyan</td>
-                <td>Food Drive Sorting</td>
-                <td>Sort non-perishables; label and stock shelves.</td>
-                <td>St. Mary’s Hall</td>
-                <td><span class="chip">Lifting</span><span class="chip">Inventory</span></td>
-                <td><span class="badge rounded-pill text-bg-secondary">Low</span></td>
-                <td>2025-10-19</td>
-                <td>30 / 40</td>
-                <td><span class="chip">English</span><span class="chip">Spanish</span></td>
-                <td><span class="badge rounded-pill text-bg-danger">No-Show</span></td>
-              </tr>
-              <tr data-volunteer="3" data-status="Cancelled" data-date="2025-10-22">
-                <td>Angelina Samsonyan</td>
-                <td>Shelter Meal Prep</td>
-                <td>Prep and package warm meals for families.</td>
-                <td>Hope Shelter Kitchen</td>
-                <td><span class="chip">Cooking</span><span class="chip">Organization</span></td>
-                <td><span class="badge rounded-pill text-bg-warning">High</span></td>
-                <td>2025-10-22</td>
-                <td>8 / 12</td>
-                <td><span class="chip">English</span></td>
-                <td><span class="badge rounded-pill text-bg-dark">Cancelled</span></td>
-              </tr>
-
-              <!-- No results row -->
-              <tr id="noRows" class="d-none">
-                <td colspan="10" class="text-center text-secondary py-4">No results match your filters.</td>
-              </tr>
+              {% endfor %}
             </tbody>
+
           </table>
         </div>
+
         <div class="p-3 border-top d-flex justify-content-between align-items-center">
-            <div class="text-secondary small" id="resultCount">Showing 4 of 4</div>
-                <div class="d-flex gap-2 ms-auto">
-                    <button class="btn btn-outline-secondary btn-sm" type="button" id="exportCsvBtn">Export CSV</button>
-                    <button class="btn btn-outline-secondary btn-sm" type="button" onclick="window.print()">Print</button>
-      </div>
+          <div class="text-secondary small" id="resultCount">
+            Showing {{ count }}
+          </div>
+          <div class="d-flex gap-2 ms-auto">
+            <button class="btn btn-outline-secondary btn-sm" type="button" id="exportCsvBtn">Export CSV</button>
+            <button class="btn btn-outline-secondary btn-sm" type="button" onclick="window.print()">Print</button>
+          </div>
+        </div>
       </section>
     </div>
   </div>
@@ -176,112 +194,37 @@
 
 {% block extra_js %}
 <script>
+// Simple CSV export
 document.addEventListener('DOMContentLoaded', function () {
-  const $  = (s, r=document) => r.querySelector(s);
-  const $$ = (s, r=document) => Array.from(r.querySelectorAll(s));
-
-  // FILTERS
-  const volunteer = $('#volunteer');
-  const fromDate  = $('#fromDate');
-  const toDate    = $('#toDate');
-  const statusSel = $('#status');
-  const applyBtn  = $('#applyBtn');
-  const resetBtn  = $('#resetFilters');
-
-  const rows      = $$('#historyBody tr');
-  const resultCnt = $('#resultCount');
-  const noRows    = $('#noRows');
-
-  function parseDate(s){ if(!s) return null; const [y,m,d]=s.split('-').map(Number); const dt=new Date(y,m-1,d); return isNaN(dt)?null:dt; }
-  function inRange(ds, fs, ts){
-    const d=parseDate(ds); if(!d) return false;
-    const f=fs?parseDate(fs):null, t=ts?parseDate(ts):null;
-    if (f && d < f) return false;
-    if (t) { const end=new Date(t.getFullYear(), t.getMonth(), t.getDate(), 23,59,59,999); if (d > end) return false; }
-    return true;
-  }
-  function validateDateRange(){
-    const f=parseDate(fromDate.value||'');
-    const t=parseDate(toDate.value||'');
-    if (f && t && t < f) { toDate.classList.add('is-invalid'); return false; }
-    toDate.classList.remove('is-invalid'); return true;
-  }
-  function applyFilters(){
-    if (!validateDateRange()) return;
-
-    const v=(volunteer.value||'').trim();
-    const s=(statusSel.value||'').trim();
-    const f=(fromDate.value||'').trim();
-    const t=(toDate.value||'').trim();
-
-    let shown=0, total=rows.length - 1; // subtract noRows row (present but hidden)
-    rows.forEach(tr=>{
-      if (tr.id === 'noRows') return;
-      const rv=tr.dataset.volunteer||'';
-      const rs=tr.dataset.status||'';
-      const rd=tr.dataset.date||'';
-      const keepV = !v || rv===v;
-      const keepS = !s || rs===s;
-      const keepD = !(f||t) || inRange(rd,f,t);
-      const vis = keepV && keepS && keepD;
-      tr.style.display = vis ? '' : 'none';
-      if (vis) shown++;
-    });
-    resultCnt.textContent = `Showing ${shown} of ${total}`;
-    noRows.classList.toggle('d-none', shown !== 0);
-  }
-  // bind
-  applyBtn?.addEventListener('click', applyFilters);
-  volunteer?.addEventListener('change', applyFilters);
-  statusSel?.addEventListener('change', applyFilters);
-  fromDate?.addEventListener('input', applyFilters);
-  toDate?.addEventListener('input', applyFilters);
-  resetBtn?.addEventListener('click', ()=>setTimeout(()=>{ 
-    rows.forEach(tr=>{ if(tr.id!=='noRows') tr.style.display=''; });
-    resultCnt.textContent = `Showing ${rows.length-1} of ${rows.length-1}`;
-    noRows.classList.add('d-none');
-    toDate.classList.remove('is-invalid');
-  },0));
-  // initial
-  resultCnt.textContent = `Showing ${rows.length-1} of ${rows.length-1}`;
-
-  // FORM VALIDATION (Event Management fields)
-  const partForm = $('#participationForm');
-  if (partForm) {
-    partForm.addEventListener('submit', function (e) {
-      // custom: at least one skill
-      const skills = $('#skills');
-      if (skills && [...skills.options].filter(o => o.selected).length === 0) {
-        skills.setCustomValidity('Select at least one skill.');
-      } else if (skills) {
-        skills.setCustomValidity('');
-      }
-      if (!partForm.checkValidity()) { e.preventDefault(); e.stopPropagation(); partForm.classList.add('was-validated'); return; }
-      // mock "save": close and reset
-      e.preventDefault();
-      const modalEl = $('#addEditModal');
-      const modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
-      modal.hide();
-      partForm.reset();
-      partForm.classList.remove('was-validated');
-    });
-  }
-
-  // EXPORT CSV of visible rows
-  $('#exportCsvBtn')?.addEventListener('click', () => {
-    const headers = $$('#historyTable thead th').map(th => th.textContent.trim());
-    const visibleRows = $$('#historyBody tr').filter(tr => tr.id !== 'noRows' && tr.style.display !== 'none');
+  const btn = document.getElementById('exportCsvBtn');
+  if (!btn) return;
+  btn.addEventListener('click', () => {
+    const headers = Array.from(document.querySelectorAll('#historyTable thead th')).map(th => th.textContent.trim());
+    const visibleRows = Array.from(document.querySelectorAll('#historyBody tr')).filter(tr => tr.style.display !== 'none');
     const data = visibleRows.map(tr => Array.from(tr.children).map(td => {
-      const text = td.textContent.trim().replace(/\s+/g,' ');
+      const text = td.textContent.trim().replace(/\s+/g, ' ');
       return '"' + text.replace(/"/g,'""') + '"';
     }));
     const csv = [headers.map(h=>`"${h.replace(/"/g,'""')}"`).join(',')]
       .concat(data.map(row => row.join(',')))
+      .concat('')
       .join('\r\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href = url; a.download = 'volunteer_history.csv';
     document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  });
+});
+</script>
+
+<script>
+// Submit to backend on change so filters combine and stay sticky
+document.addEventListener('DOMContentLoaded', function () {
+  const form = document.getElementById('filterForm');
+  if (!form) return;
+
+  form.addEventListener('change', function () {
+    if (form.requestSubmit) form.requestSubmit(); else form.submit();
   });
 });
 </script>
