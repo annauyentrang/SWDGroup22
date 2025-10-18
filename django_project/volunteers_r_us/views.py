@@ -4,22 +4,99 @@ from django.contrib.auth import get_user_model
 from .models import Notification
 
 from datetime import datetime, date
+from datetime import date
+from django.shortcuts import render
+from django.shortcuts import render
+from .models import Notification
+from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout, get_user_model
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
+from django.shortcuts import render, redirect
+from django.contrib.auth.decorators import login_required, user_passes_test
+from django.contrib import messages
+from .forms import UserProfileForm, EventForm, STATE_CHOICES, SKILL_CHOICES, URGENCY_CHOICES
+
+User = get_user_model()
 
 def home(request):
     return render(request, 'home.html')
 
-def login(request):
-    return render(request, 'login.html')
+def login_view(request):
+    # Renders form on GET; authenticates on POST
+    ctx = {}
+    if request.method == "POST":
+        email = request.POST.get("email", "").strip().lower()
+        password = request.POST.get("password", "")
 
-def register(request):
-    return render(request, 'register.html')
-    
+        # Basic field validations (Assignment requirement)
+        errors = []
+        if not email:
+            errors.append("Email is required.")
+        if not password:
+            errors.append("Password is required.")
+        if errors:
+            ctx["info"] = " ".join(errors)
+            return render(request, "login.html", ctx)
+
+        user = authenticate(request, username=email, password=password)
+        if user is not None:
+            auth_login(request, user)
+            return redirect(request.GET.get("next") or "home")
+        ctx["info"] = "Invalid email or password."
+    return render(request, "login.html", ctx)
+
+def register_view(request):
+    # Renders form on GET; creates user on POST
+    ctx = {}
+    if request.method == "POST":
+        email = request.POST.get("email", "").strip().lower()
+        password = request.POST.get("password", "")
+        confirm = request.POST.get("confirm", "")
+
+        # Server-side validations (required fields, types/length)
+        errors = []
+        if not email:
+            errors.append("Email is required.")
+        if not password:
+            errors.append("Password is required.")
+        if password and len(password) < 8:
+            errors.append("Password must be at least 8 characters.")
+        if password != confirm:
+            errors.append("Passwords must match.")
+        if User.objects.filter(email__iexact=email).exists():
+            errors.append("An account with that email already exists.")
+
+        # Run Django’s password validators too
+        if password:
+            try:
+                validate_password(password)
+            except ValidationError as ve:
+                errors.extend(ve.messages)
+
+        if errors:
+            ctx["info"] = " ".join(errors)
+            return render(request, "register.html", ctx)
+
+        # Create user and redirect to login
+        User.objects.create_user(email=email, password=password)
+        ctx["info"] = "Account created. Please sign in."
+        return redirect("login")
+
+    return render(request, "register.html", ctx)
+
+def logout_view(request):
+    auth_logout(request)
+    return redirect("home")
+
+@login_required
 def profile_form(request):
     return render(request, "profile_form.html")
 
+@login_required
 def event_form(request):
     return render(request, "event_form.html")
 
+@login_required
 # volunteers_r_us/views.py
 from django.shortcuts import render
 
@@ -27,8 +104,8 @@ from django.shortcuts import render
 from django.shortcuts import render
 from .models import Notification
 
-from volunteers_r_us.matching.data import VOLUNTEERS as VDATA, EVENTS as EDATA
-from volunteers_r_us.matching.logic import score, volunteer_to_dict, event_to_dict
+from matching.data import VOLUNTEERS as VDATA, EVENTS as EDATA
+from matching.logic import score, volunteer_to_dict, event_to_dict
 
 
 def match_volunteer(request):
@@ -182,7 +259,7 @@ HISTORY = [
     
 ]
 
-
+@login_required
 def volunteer_history(request):
     v = (request.GET.get("volunteer") or "").strip()
     s = (request.GET.get("status") or "").strip()
@@ -222,3 +299,47 @@ def volunteer_history(request):
         },
     )
 
+def profile_form(request):
+    if request.method == "POST":
+        form = UserProfileForm(request.POST)
+        if form.is_valid():
+            cleaned = form.cleaned_data.copy()
+            cleaned["availability"] = [d.isoformat() for d in cleaned["availability"]]
+            # Persist later via DB; for now store in session
+            request.session["last_profile"] = cleaned
+            messages.success(request, "Profile saved (validated on backend).")
+            return redirect("profile_form")
+        messages.error(request, "Please fix the errors below.")
+    else:
+        initial = request.session.get("last_profile")
+        form = UserProfileForm(initial=initial)
+
+    selected_state = (request.POST.get("state")
+                      if request.method == "POST"
+                      else (form.initial or {}).get("state"))
+    selected_skills = set(request.POST.getlist("skills")) if request.method == "POST" \
+                      else set((form.initial or {}).get("skills", []))
+
+
+    ctx = {"form": form, "STATE_CHOICES": STATE_CHOICES, "SKILL_CHOICES": SKILL_CHOICES, "selected_state": selected_state,
+        "selected_skills": selected_skills,}
+    return render(request, "profile_form.html", ctx)
+
+def event_form(request):
+    if request.method == "POST":
+        form = EventForm(request.POST)
+        if form.is_valid():
+            cleaned = form.cleaned_data.copy()
+            request.session.setdefault("events", [])
+            request.session["events"] = request.session["events"] + [cleaned]
+            messages.success(request, "Event created (validated on backend).")
+            return redirect("event_form")
+        messages.error(request, "Please fix the errors below.")
+    else:
+        form = EventForm()
+
+    selected_required_skills = set(request.POST.getlist("required_skills")) if request.method == "POST" else set()
+    selected_urgency = request.POST.get("urgency") if request.method == "POST" else None
+
+    ctx = {"form": form, "SKILL_CHOICES": SKILL_CHOICES, "URGENCY_CHOICES": URGENCY_CHOICES, "selected_required_skills": selected_required_skills, "selected_urgency": selected_urgency,}
+    return render(request, "event_form.html", ctx)
