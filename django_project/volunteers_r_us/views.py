@@ -107,7 +107,7 @@ from .models import Notification
 from .matching.data import VOLUNTEERS as VDATA, EVENTS as EDATA
 from .matching.logic import score, volunteer_to_dict, event_to_dict
 
-
+@login_required
 def match_volunteer(request):
     # map backend dataclasses -> the fields your template expects
     def _slot_from_timeblocks(tb): return next(iter(tb), "")
@@ -299,6 +299,7 @@ def volunteer_history(request):
         },
     )
 
+@login_required
 def profile_form(request):
     if request.method == "POST":
         form = UserProfileForm(request.POST)
@@ -325,6 +326,7 @@ def profile_form(request):
         "selected_skills": selected_skills,}
     return render(request, "profile_form.html", ctx)
 
+@login_required
 def event_form(request):
     if request.method == "POST":
         form = EventForm(request.POST)
