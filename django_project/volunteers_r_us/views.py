@@ -1,101 +1,155 @@
-from django.shortcuts import render, redirect
-from django.http import HttpResponse
-from django.contrib.auth import get_user_model
-from .models import Notification
-from datetime import date
-from django.shortcuts import render
-from django.shortcuts import render
-from .models import Notification
-from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout, get_user_model
-from django.contrib.auth.password_validation import validate_password
-from django.core.exceptions import ValidationError
-from django.shortcuts import render, redirect
-from django.contrib.auth.decorators import login_required, user_passes_test
+# volunteers_r_us/views.py
+from __future__ import annotations
+
+from dataclasses import dataclass  # (kept if you later use dataclasses)
+from datetime import date, datetime
+from typing import Iterable, Optional
+
+from django.conf import settings
 from django.contrib import messages
-from .forms import UserProfileForm, EventForm, STATE_CHOICES, SKILL_CHOICES, URGENCY_CHOICES
+from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout, get_user_model
+from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ValidationError
+from django.http import HttpRequest, HttpResponse
+from django.shortcuts import render, redirect
+from django.views.decorators.http import require_http_methods
+
+from .forms import (
+    LoginForm,
+    RegisterForm,
+    UserProfileForm,
+    EventForm,
+    STATE_CHOICES,
+    SKILL_CHOICES,
+    URGENCY_CHOICES,
+)
+from .models import Notification
 
 User = get_user_model()
 
-def home(request):
-    return render(request, 'home.html')
+# ---------------------------
+# Basic pages & auth
+# ---------------------------
+def home(request: HttpRequest) -> HttpResponse:
+    return render(request, "home.html")
 
-def login_view(request):
-    # Renders form on GET; authenticates on POST
-    ctx = {}
-    if request.method == "POST":
-        email = request.POST.get("email", "").strip().lower()
-        password = request.POST.get("password", "")
 
-        # Basic field validations (Assignment requirement)
-        errors = []
-        if not email:
-            errors.append("Email is required.")
-        if not password:
-            errors.append("Password is required.")
-        if errors:
-            ctx["info"] = " ".join(errors)
-            return render(request, "login.html", ctx)
-
-        user = authenticate(request, username=email, password=password)
-        if user is not None:
-            auth_login(request, user)
+@require_http_methods(["GET", "POST"])
+def login_view(request: HttpRequest) -> HttpResponse:
+    """
+    Renders login form on GET; authenticates on POST using email+password
+    against the InMemoryBackend (or whichever backend you configured).
+    """
+    form = LoginForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        email = form.cleaned_data["email"]
+        password = form.cleaned_data["password"]
+        user = authenticate(request, email=email, password=password)
+        if user:
+            auth_login(request, user, backend="volunteers_r_us.auth_backends.InMemoryBackend")
+            messages.success(request, f"Welcome back, {email}!")
             return redirect(request.GET.get("next") or "home")
-        ctx["info"] = "Invalid email or password."
-    return render(request, "login.html", ctx)
+        messages.error(request, "Invalid email or password.")
+    return render(request, "login.html", {"form": form})
 
-def register_view(request):
-    # Renders form on GET; creates user on POST
-    ctx = {}
-    if request.method == "POST":
-        email = request.POST.get("email", "").strip().lower()
-        password = request.POST.get("password", "")
-        confirm = request.POST.get("confirm", "")
 
-        # Server-side validations (required fields, types/length)
-        errors = []
-        if not email:
-            errors.append("Email is required.")
-        if not password:
-            errors.append("Password is required.")
-        if password and len(password) < 8:
-            errors.append("Password must be at least 8 characters.")
-        if password != confirm:
-            errors.append("Passwords must match.")
-        if User.objects.filter(email__iexact=email).exists():
-            errors.append("An account with that email already exists.")
+@require_http_methods(["GET", "POST"])
+def register(request: HttpRequest) -> HttpResponse:
+    """
+    Renders register form on GET; creates a user on POST.
+    If you’re using a demo in-memory store, uncomment the DEMO_USERS write.
+    If you have a real User model, call User.objects.create_user.
+    """
+    form = RegisterForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        email = form.cleaned_data["email"]
+        password = form.cleaned_data["password"]
 
-        # Run Django’s password validators too
-        if password:
-            try:
-                validate_password(password)
-            except ValidationError as ve:
-                errors.extend(ve.messages)
+        # If you truly want in-memory demo auth:
+        # settings.DEMO_USERS[email] = password
 
-        if errors:
-            ctx["info"] = " ".join(errors)
-            return render(request, "register.html", ctx)
+        # Otherwise create a real Django user (recommended if tests expect it):
+        if not User.objects.filter(email__iexact=email).exists():
+            User.objects.create_user(email=email, password=password)
 
-        # Create user and redirect to login
-        User.objects.create_user(email=email, password=password)
-        ctx["info"] = "Account created. Please sign in."
+        messages.success(request, "Account created successfully! You can now log in.")
         return redirect("login")
+    return render(request, "register.html", {"form": form})
 
-    return render(request, "register.html", ctx)
 
-def logout_view(request):
+def logout_view(request: HttpRequest) -> HttpResponse:
     auth_logout(request)
+    messages.info(request, "You have been logged out.")
     return redirect("home")
 
-@login_required   
-def profile_form(request):
-    return render(request, "profile_form.html")
+
+# ---------------------------
+# Profile & Event forms (server-side validation)
+# ---------------------------
+@login_required
+def profile_form(request: HttpRequest) -> HttpResponse:
+    if request.method == "POST":
+        form = UserProfileForm(request.POST)
+        if form.is_valid():
+            cleaned = form.cleaned_data.copy()
+            # store date list as iso strings so it’s JSON-serializable in session
+            if "availability" in cleaned:
+                cleaned["availability"] = [d.isoformat() for d in cleaned["availability"]]
+            request.session["last_profile"] = cleaned
+            messages.success(request, "Profile saved (validated on backend).")
+            return redirect("profile_form")
+        messages.error(request, "Please fix the errors below.")
+    else:
+        initial = request.session.get("last_profile")
+        form = UserProfileForm(initial=initial)
+
+    selected_state = (request.POST.get("state")
+                      if request.method == "POST"
+                      else (form.initial or {}).get("state"))
+    selected_skills = set(request.POST.getlist("skills")) if request.method == "POST" \
+                      else set((form.initial or {}).get("skills", []))
+
+    ctx = {
+        "form": form,
+        "STATE_CHOICES": STATE_CHOICES,
+        "SKILL_CHOICES": SKILL_CHOICES,
+        "selected_state": selected_state,
+        "selected_skills": selected_skills,
+    }
+    return render(request, "profile_form.html", ctx)
+
 
 @login_required
-def event_form(request):
-    return render(request, "event_form.html")
+def event_form(request: HttpRequest) -> HttpResponse:
+    if request.method == "POST":
+        form = EventForm(request.POST)
+        if form.is_valid():
+            cleaned = form.cleaned_data.copy()
+            request.session.setdefault("events", [])
+            request.session["events"] = request.session["events"] + [cleaned]
+            messages.success(request, "Event created (validated on backend).")
+            return redirect("event_form")
+        messages.error(request, "Please fix the errors below.")
+    else:
+        form = EventForm()
 
-@login_required
-def match_volunteer(request):
+    selected_required_skills = set(request.POST.getlist("required_skills")) if request.method == "POST" else set()
+    selected_urgency = request.POST.get("urgency") if request.method == "POST" else None
+
+    ctx = {
+        "form": form,
+        "SKILL_CHOICES": SKILL_CHOICES,
+        "URGENCY_CHOICES": URGENCY_CHOICES,
+        "selected_required_skills": selected_required_skills,
+        "selected_urgency": selected_urgency,
+    }
+    return render(request, "event_form.html", ctx)
+
+
+# ---------------------------
+# Matching demo with notification
+# ---------------------------
+def match_volunteer(request: HttpRequest) -> HttpResponse:
     volunteers = [
         {"id": 1, "name": "Alice Nguyen", "skills": ["Spanish", "CPR"],
          "languages": ["English", "Spanish"], "availability": ["sat_am", "sun_pm"],
@@ -132,9 +186,12 @@ def match_volunteer(request):
     overlap = vskills & eskills
     time_fit = selected["slot"] in volunteer["availability"]
     warnings, missing = [], (eskills - vskills)
-    if selected["capacity_remaining"] <= 0: warnings.append("No capacity remaining.")
-    if missing: warnings.append(f"Missing required skills: {', '.join(sorted(missing))}.")
-    if not time_fit: warnings.append("Volunteer not available for this time slot.")
+    if selected["capacity_remaining"] <= 0:
+        warnings.append("No capacity remaining.")
+    if missing:
+        warnings.append(f"Missing required skills: {', '.join(sorted(missing))}.")
+    if not time_fit:
+        warnings.append("Volunteer not available for this time slot.")
     if selected["bg_check"] and "Background Check" not in volunteer["certifications"]:
         warnings.append("Background check required but not on file.")
 
@@ -161,21 +218,31 @@ def match_volunteer(request):
                 "warnings": warnings,
             }
 
-            # create notification only on POST, only if authenticated
             if request.user.is_authenticated:
                 Notification.objects.create(
                     user=request.user,
                     message=f"Assigned {volunteer['name']} to {selected['title']}",
-                    url=request.path,  # safe default
+                    url=request.path,
                 )
 
     ctx = {
-        "volunteers": volunteers, "volunteer": volunteer, "events": events,
-        "selected": selected, "suggested": suggested, "match_score": match_score,
-        "match_reason": match_reason, "warnings": warnings, "saved": saved, "errors": errors,
+        "volunteers": volunteers,
+        "volunteer": volunteer,
+        "events": events,
+        "selected": selected,
+        "suggested": suggested,
+        "match_score": match_score,
+        "match_reason": match_reason,
+        "warnings": warnings,
+        "saved": saved,
+        "errors": errors,
     }
     return render(request, "match_form.html", ctx)
 
+
+# ---------------------------
+# Volunteer History (filtering)
+# ---------------------------
 VOLUNTEERS = {
     "1": "Nareh Hovhanesian",
     "2": "Katia Qahwajian",
@@ -236,20 +303,22 @@ HISTORY = [
         "languages": ["English"],
         "status": "Cancelled",
     },
-    
 ]
 
+
 @login_required
-def volunteer_history(request):
+def volunteer_history(request: HttpRequest) -> HttpResponse:
     v = (request.GET.get("volunteer") or "").strip()
     s = (request.GET.get("status") or "").strip()
     f = (request.GET.get("from") or "").strip()
     t = (request.GET.get("to") or "").strip()
 
-    def parse(d: str):
+    def parse(d: str) -> Optional[date]:
+        if not d:
+            return None
         try:
             return datetime.strptime(d, "%Y-%m-%d").date()
-        except Exception:
+        except ValueError:
             return None
 
     fdate, tdate = parse(f), parse(t)
@@ -278,48 +347,3 @@ def volunteer_history(request):
             "filters": {"volunteer": v, "status": s, "from": f, "to": t},
         },
     )
-
-def profile_form(request):
-    if request.method == "POST":
-        form = UserProfileForm(request.POST)
-        if form.is_valid():
-            cleaned = form.cleaned_data.copy()
-            cleaned["availability"] = [d.isoformat() for d in cleaned["availability"]]
-            # Persist later via DB; for now store in session
-            request.session["last_profile"] = cleaned
-            messages.success(request, "Profile saved (validated on backend).")
-            return redirect("profile_form")
-        messages.error(request, "Please fix the errors below.")
-    else:
-        initial = request.session.get("last_profile")
-        form = UserProfileForm(initial=initial)
-
-    selected_state = (request.POST.get("state")
-                      if request.method == "POST"
-                      else (form.initial or {}).get("state"))
-    selected_skills = set(request.POST.getlist("skills")) if request.method == "POST" \
-                      else set((form.initial or {}).get("skills", []))
-
-
-    ctx = {"form": form, "STATE_CHOICES": STATE_CHOICES, "SKILL_CHOICES": SKILL_CHOICES, "selected_state": selected_state,
-        "selected_skills": selected_skills,}
-    return render(request, "profile_form.html", ctx)
-
-def event_form(request):
-    if request.method == "POST":
-        form = EventForm(request.POST)
-        if form.is_valid():
-            cleaned = form.cleaned_data.copy()
-            request.session.setdefault("events", [])
-            request.session["events"] = request.session["events"] + [cleaned]
-            messages.success(request, "Event created (validated on backend).")
-            return redirect("event_form")
-        messages.error(request, "Please fix the errors below.")
-    else:
-        form = EventForm()
-    
-    selected_required_skills = set(request.POST.getlist("required_skills")) if request.method == "POST" else set()
-    selected_urgency = request.POST.get("urgency") if request.method == "POST" else None
-
-    ctx = {"form": form, "SKILL_CHOICES": SKILL_CHOICES, "URGENCY_CHOICES": URGENCY_CHOICES, "selected_required_skills": selected_required_skills, "selected_urgency": selected_urgency,}
-    return render(request, "event_form.html", ctx)
