@@ -25,12 +25,12 @@
 
         <!-- Notifications: always visible -->
         <div class="dropdown">
-          <button class="btn btn-outline-secondary position-relative"
-                  data-bs-toggle="dropdown" aria-expanded="false" aria-label="Notifications">
+         <button id="notif-button" class="btn btn-outline-secondary position-relative"
+            data-bs-toggle="dropdown" aria-expanded="false" aria-label="Notifications">
             <i class="bi bi-bell" id="notif-icon"></i>
             <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
                   id="notif-badge" hidden>0</span>
-          </button>
+         </button>
           <ul class="dropdown-menu dropdown-menu-end" style="min-width:320px" id="notif-list">
             <li><span class="dropdown-item-text text-muted">No notifications</span></li>
           </ul>
@@ -53,6 +53,92 @@
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="{% static 'main.js' %}"></script>
+
+<script>
+
+// --- CSRF for session auth ---
+function getCookie(name){
+  const m = document.cookie.match('(^|;)\\s*'+name+'\\s*=\\s*([^;]+)');
+  return m ? m.pop() : '';
+}
+const CSRF = getCookie('csrftoken');
+async function jget(url){ const r=await fetch(url,{headers:{'X-CSRFToken':CSRF}}); if(!r.ok) throw new Error(await r.text()); return r.json(); }
+async function jpost(url, body){ const r=await fetch(url,{method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':CSRF}, body: body?JSON.stringify(body):null}); if(!r.ok) throw new Error(await r.text()); return r.json(); }
+
+// --- DOM refs ---
+const badge = document.getElementById('notif-badge');
+const list  = document.getElementById('notif-list');
+
+// --- Render helpers ---
+function renderItems(items){
+  list.innerHTML = '';
+  if(!items.length){
+    list.innerHTML = `<li><span class="dropdown-item-text text-muted">No notifications</span></li>`;
+    return;
+  }
+  // items
+  for(const it of items){
+    const li = document.createElement('li');
+    li.innerHTML = `
+      <a class="dropdown-item d-block ${it.is_read?'':'fw-semibold'}" href="${it.url||'#'}" data-id="${it.id}">
+        <div class="small text-muted">${new Date(it.created_at).toLocaleString()}</div>
+        <div>${it.title||'(no title)'}</div>
+        ${it.body ? `<div class="small text-muted">${it.body}</div>` : ''}
+      </a>`;
+    list.appendChild(li);
+  }
+  // divider + mark-all
+  list.insertAdjacentHTML('beforeend',
+    `<li><hr class="dropdown-divider"></li>
+     <li><button class="dropdown-item text-center" id="mark-all">Mark all read</button></li>`);
+}
+
+async function refreshBadge(){
+  try{
+    const d = await jget('/api/notifications/unread_count/');
+    if(d.count > 0){ badge.textContent = d.count; badge.hidden = false; }
+    else { badge.hidden = true; }
+  }catch(e){ /* ignore */ }
+}
+
+async function loadRecent(){
+  try{
+    const d = await jget('/api/notifications/recent/');
+    renderItems(d.items||[]);
+  }catch(e){
+    list.innerHTML = `<li><span class="dropdown-item-text text-danger">Error loading</span></li>`;
+  }
+}
+
+// --- Events ---
+document.addEventListener('click', async (e)=>{
+  // mark one read on click of an item
+  const a = e.target.closest('a.dropdown-item[data-id]');
+  if(a && list.contains(a)){
+    const id = a.getAttribute('data-id');
+    try{ await jpost(`/api/notifications/${id}/mark_read/`); }catch(_){}
+    await refreshBadge();
+    // do not block navigation if it.url exists; if href="#", prevent scroll jump
+    if(a.getAttribute('href') === '#'){ e.preventDefault(); await loadRecent(); }
+  }
+  // mark all
+  if(e.target && e.target.id === 'mark-all'){
+    e.preventDefault();
+    try{ await jpost('/api/notifications/mark_all_read/'); }catch(_){}
+    await refreshBadge();
+    await loadRecent();
+  }
+});
+
+// When dropdown opens, fetch list
+const btn = document.getElementById('notif-button');
+btn.addEventListener('shown.bs.dropdown', () => { loadRecent(); refreshBadge(); });
+
+// --- Kickoff ---
+refreshBadge();
+setInterval(refreshBadge, 15000); // poll
+</script>
+
 </body>
 </html>
 
