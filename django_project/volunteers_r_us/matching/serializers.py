@@ -24,3 +24,4 @@ class EventMatchForm(forms.Form):
         v = self.cleaned_data.get("max_radius_miles")
         # treat empty string as None
         return None if v in ("", None) else v
+
