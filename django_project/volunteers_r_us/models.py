@@ -100,3 +100,64 @@ class Notification(models.Model):
         return f"Notification for {self.user} at {self.created_at}"
 
 
+
+
+    
+
+
+
+
+
+
+# ---------------------------
+# Assignment Model
+# ---------------------------
+
+# models.py
+from django.conf import settings
+from django.db import models
+
+class Assignment(models.Model):
+    ASSIGNED  = "assigned"
+    ATTENDED  = "attended"
+    NO_SHOW   = "no_show"
+    CANCELLED = "cancelled"
+    STATUS_CHOICES = [
+        (ASSIGNED,  "Assigned"),
+        (ATTENDED,  "Attended"),
+        (NO_SHOW,   "No-Show"),
+        (CANCELLED, "Cancelled"),
+    ]
+
+    # Using raw ids/titles because you said you don't have Volunteer/Event models yet
+    volunteer_id   = models.CharField(max_length=64)
+    volunteer_name = models.CharField(max_length=255, blank=True)
+    event_id       = models.CharField(max_length=64)
+    event_title    = models.CharField(max_length=255, blank=True)
+
+    status   = models.CharField(max_length=20, choices=STATUS_CHOICES, default=ASSIGNED)
+    notify   = models.BooleanField(default=False)
+    override = models.BooleanField(default=False)
+    override_reason = models.TextField(blank=True)
+    admin_notes     = models.TextField(blank=True)
+
+    match_score  = models.FloatField(default=0)
+    match_reason = models.TextField(blank=True)
+    warnings     = models.JSONField(default=list, blank=True)  # OK on Django 3.1+
+
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("volunteer_id", "event_id")
+        indexes = [
+            models.Index(fields=["event_id", "status"]),
+            models.Index(fields=["volunteer_id"]),
+        ]
+
+    def __str__(self):
+        return f"{self.volunteer_id} → {self.event_id} ({self.status})"
+
+
+
