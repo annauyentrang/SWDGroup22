@@ -21,3 +21,17 @@ class UserAdmin(BaseUserAdmin):
 class NotificationAdmin(admin.ModelAdmin):
     list_display = ("user", "message", "created_at")
     list_filter = ("created_at",)
+
+
+
+
+# admin.py
+from django.contrib import admin
+from .models import Assignment
+
+@admin.register(Assignment)
+class AssignmentAdmin(admin.ModelAdmin):
+    list_display = ("id","volunteer_id","volunteer_name","event_id","event_title","status","notify","override","created_by","created_at")
+    list_filter = ("status","notify","override","created_at")
+    search_fields = ("volunteer_id","volunteer_name","event_id","event_title","match_reason","admin_notes")
+
