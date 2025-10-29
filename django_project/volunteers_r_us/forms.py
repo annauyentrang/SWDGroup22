@@ -1,30 +1,8 @@
 from datetime import date
 from django import forms
 from django.core.validators import RegexValidator
+from .choices import STATE_CHOICES, SKILL_CHOICES
 
-STATE_CHOICES = [(s, s) for s in [
-    "AL","AK","AZ","AR","CA","CO","CT","DE","DC","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA",
-    "ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR",
-    "PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"
-]]
-
-SKILL_CHOICES = [
-    ("first_aid", "First Aid / CPR"),
-    ("teaching", "Teaching / Tutoring"),
-    ("childcare", "Childcare"),
-    ("elderly_care", "Elderly Care"),
-    ("event_support", "Event Setup / Cleanup"),
-    ("cooking", "Cooking & Meal Prep"),
-    ("driving", "Driving / Transport"),
-    ("it_support", "IT Support"),
-    ("graphic_design", "Graphic Design"),
-    ("social_media", "Social Media & Marketing"),
-    ("translation", "Translation / Interpretation"),
-    ("fundraising", "Fundraising"),
-    ("photography", "Photography / Videography"),
-    ("environment", "Environmental Conservation"),
-    ("disaster_relief", "Disaster Relief"),
-]
 
 URGENCY_CHOICES = [
     ("low", "Low"),
@@ -37,6 +15,22 @@ zip_validator = RegexValidator(
     regex=r"^\d{5}(-?\d{4})?$",
     message="Enter a 5-digit ZIP or 9-digit ZIP (with or without hyphen)."
 )
+
+class ProfileForm(forms.ModelForm):
+    # Rendered as <select multiple>; we’ll set the list on save()
+    skills = forms.MultipleChoiceField(choices=SKILL_CHOICES, required=True)
+
+    class Meta:
+        model = Profile
+        fields = [
+            "full_name", "address1", "address2",
+            "city", "state", "zipcode",
+            "preferences",
+            # NOTE: availability is handled as hidden inputs “availability[]”
+        ]
+        widgets = {
+            "state": forms.Select(choices=STATE_CHOICES),
+        }
 
 class UserProfileForm(forms.Form):
     full_name = forms.CharField(max_length=50, required=True)
