@@ -14,7 +14,12 @@ from django.core.exceptions import ValidationError
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
-from .forms import UserProfileForm, EventForm, STATE_CHOICES, SKILL_CHOICES, URGENCY_CHOICES
+rom io import BytesIO
+from datetime import datetime as _dt
+from .models import Profile
+from .forms import ProfileForm, EventForm, STATE_CHOICES, SKILL_CHOICES
+import logging
+from django.conf import settings
 
 User = get_user_model()
 
