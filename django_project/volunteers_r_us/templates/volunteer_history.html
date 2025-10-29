@@ -6,11 +6,31 @@
   .page-title { font-weight:800; letter-spacing:.2px; }
   .card-soft { border:1px solid #eef0f4; border-radius:1rem; box-shadow:0 2px 10px rgba(17,24,39,.04); background:#fff; }
   .chip { display:inline-block; padding:.15rem .5rem; border-radius:999px; background:#eef2ff; color:#3730a3; font-size:.8rem; margin-right:.25rem; }
-  .table thead th { white-space:nowrap; }
-  .table thead { position:sticky; top:0; background:#fff; z-index:1; }
   .help { font-size:.85rem; color:#6b7280; }
-  .table-wrap { display:flex; justify-content:center; overflow-x:auto; }
-  .table { width:auto; margin:0 auto; }
+  .container {
+    max-width: 100% !important;
+  }
+  :root{
+    --brand-blue: var(--bs-primary, #0d6efd);
+    --row-alt: #f6f9ff;
+    --row-hover: #eef5ff;
+  }
+  .table thead th {
+    background: var(--brand-blue);
+    color: #fff;
+    font-weight: 700;
+    letter-spacing: .2px;
+    white-space: nowrap;
+    padding: 1rem 1.25rem;
+    border: none !important;
+  }
+  .table.themed-table thead th:first-child { border-top-left-radius: .8rem; }
+  .table.themed-table thead th:last-child  { border-top-right-radius: .8rem; }
+  .table.themed-table td { padding: 1rem 1.5rem; vertical-align: middle; word-wrap: break-word; border-top: 0; background: #fff; }
+  .table.themed-table tbody tr { box-shadow: 0 2px 8px rgba(13,110,253,.06); }
+  .table.themed-table tbody tr:nth-child(even) { background: var(--row-alt); }
+  .table.themed-table tbody tr:hover { background: var(--row-hover); }
+
 </style>
 {% endblock %}
 
@@ -28,65 +48,52 @@
     </div>
   {% endif %}
 
-  <div class="row justify-content-center">
-    <div class="col-lg-10">
+  <div class="row">
+    <div class="col-12 px-4">
       <div class="d-flex align-items-center justify-content-between mb-2">
         <h1 class="page-title mb-0">Volunteer History</h1>
-        <button class="btn btn-outline-primary btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#addEditModal">
-          Add / Edit Participation
-        </button>
+        {# Removed Add / Edit Participation button #}
       </div>
-      <p class="text-secondary">Tabular display of all participation history. Includes all Event Management fields and participation status.</p>
+      <p class="text-secondary">
+        Tabular display of all participation history. Data shown below is loaded dynamically from the VolunteerParticipation database table.
+      </p>
 
       <!-- FILTERS -->
       <section class="card-soft p-3 p-md-4 mb-4">
         <form class="row g-3 align-items-end" id="filterForm" method="get" action="">
           <!-- Volunteer -->
-          <div class="col-sm-4">
+          <div class="col-sm-6 filter-col">
             <label for="volunteer" class="form-label">Volunteer</label>
             <select id="volunteer" name="volunteer" class="form-select" aria-describedby="volHelp">
               <option value="" {% if not filter.volunteer %}selected{% endif %}>Any</option>
               {% for v in volunteers %}
                 <option value="{{ v.id }}"
                         {% if filter.volunteer|stringformat:"s" == v.id|stringformat:"s" %}selected{% endif %}>
-                  {{ v.full_name }} (ID {{ v.id }})
+                  {{ v.full_name }}
                 </option>
               {% endfor %}
             </select>
-            <div id="volHelp" class="help">Choose a specific volunteer or leave as “Any”.</div>
-          </div>
-
-          <!-- From date (STICKY VALUE + CORRECT NAME) -->
-          <div class="col-sm-4">
-            <label for="fromDate" class="form-label">From Date</label>
-            <input
-              id="fromDate"
-              name="from_date"
-              type="date"
-              class="form-control"
-              value="{{ filter.from_date }}"
-              autocomplete="off"
-              placeholder="mm/dd/yyyy"
-            >
-            <div class="help">Show participation starting from this date.</div>
+            <div id="volHelp" class="help">Choose a volunteer or leave as “Any”.</div>
           </div>
 
           <!-- Status -->
-          <div class="col-sm-4">
+          <div class="col-sm-6 filter-col">
             <label for="status" class="form-label">Status</label>
             <select id="status" name="status" class="form-select">
               <option value="" {% if not filter.status %}selected{% endif %}>Any</option>
-              {% with fs=filter.status|default:'' %}
-                {% for s in statuses %}
-                  <option value="{{ s }}" {% if fs|lower == s|lower %}selected{% endif %}>{{ s }}</option>
-                {% empty %}
-                  <option>Registered</option>
-                  <option>Attended</option>
-                  <option>No-Show</option>
-                  <option>Cancelled</option>
-                {% endfor %}
-              {% endwith %}
+              {% for s in statuses %}
+                <option value="{{ s }}" {% if filter.status == s %}selected{% endif %}>{{ s }}</option>
+              {% endfor %}
             </select>
+            <div class="help">Choose a status or leave as “Any”.</div>
+          </div>
+
+          <!-- Date -->
+          <div class="col-sm-4">
+            <label for="from_date" class="form-label">Date</label>
+            <input id="from_date" name="from_date" type="date" class="form-control"
+                  value="{{ filter.from_date|default:'' }}">
+            <div class="help">Show events on or after this date.</div>
           </div>
 
           <!-- Actions -->
@@ -112,25 +119,17 @@
                 <th>Event Date</th>
                 <th>Capacity</th>
                 <th>Languages</th>
-                <th>Participation Status</th>
+                <th>Status</th>
               </tr>
             </thead>
             <tbody id="historyBody">
               {% for r in rows %}
-              <tr
-                data-volunteer="{{ r.volunteer_id }}"
-                data-status="{{ r.status }}"
-                data-date="{% if r.event_date %}{{ r.event_date|date:'Y-m-d' }}{% endif %}"
-              >
+              <tr data-volunteer="{{ r.volunteer_id }}" data-status="{{ r.status }}">
                 <td>{{ r.volunteer_name }}</td>
                 <td>{{ r.event_name }}</td>
                 <td>{{ r.description }}</td>
                 <td>{{ r.location }}</td>
-                <td>
-                  {% for s in r.required_skills %}
-                    <span class="chip">{{ s }}</span>
-                  {% endfor %}
-                </td>
+                <td>{% for s in r.required_skills %}<span class="chip">{{ s }}</span>{% endfor %}</td>
                 <td>
                   {% if r.urgency == "High" %}
                     <span class="badge rounded-pill text-bg-warning">High</span>
@@ -140,19 +139,9 @@
                     <span class="badge rounded-pill text-bg-secondary">Low</span>
                   {% endif %}
                 </td>
-                <td>
-                  {% if r.event_date %}
-                    {{ r.event_date|date:"Y-m-d" }}
-                  {% else %}
-                    —
-                  {% endif %}
-                </td>
+                <td>{% if r.event_date %}{{ r.event_date|date:"Y-m-d" }}{% else %}—{% endif %}</td>
                 <td>{{ r.capacity }}</td>
-                <td>
-                  {% for lang in r.languages %}
-                    <span class="chip">{{ lang }}</span>
-                  {% endfor %}
-                </td>
+                <td>{% for lang in r.languages %}<span class="chip">{{ lang }}</span>{% endfor %}</td>
                 <td>
                   {% if r.status == "Registered" %}
                     <span class="badge rounded-pill bg-secondary">Registered</span>
@@ -168,21 +157,21 @@
               {% empty %}
               <tr>
                 <td colspan="10" class="text-center text-secondary py-4">
-                  No results match your filters.
+                  No results found in the database.
                 </td>
               </tr>
               {% endfor %}
             </tbody>
-
           </table>
         </div>
 
         <div class="p-3 border-top d-flex justify-content-between align-items-center">
-          <div class="text-secondary small" id="resultCount">
-            Showing {{ count }}
-          </div>
+          <div class="text-secondary small">Showing {{ count }}</div>
           <div class="d-flex gap-2 ms-auto">
-            <button class="btn btn-outline-secondary btn-sm" type="button" id="exportCsvBtn">Export CSV</button>
+            <a class="btn btn-outline-secondary btn-sm"
+              href="?export=1{% if filter.volunteer %}&volunteer={{ filter.volunteer|urlencode }}{% endif %}{% if filter.status %}&status={{ filter.status|urlencode }}{% endif %}{% if filter.from_date %}&from_date={{ filter.from_date|urlencode }}{% endif %}">
+              Export csv
+            </a>
             <button class="btn btn-outline-secondary btn-sm" type="button" onclick="window.print()">Print</button>
           </div>
         </div>
@@ -194,37 +183,19 @@
 
 {% block extra_js %}
 <script>
-// Simple CSV export
 document.addEventListener('DOMContentLoaded', function () {
   const btn = document.getElementById('exportCsvBtn');
   if (!btn) return;
   btn.addEventListener('click', () => {
     const headers = Array.from(document.querySelectorAll('#historyTable thead th')).map(th => th.textContent.trim());
-    const visibleRows = Array.from(document.querySelectorAll('#historyBody tr')).filter(tr => tr.style.display !== 'none');
-    const data = visibleRows.map(tr => Array.from(tr.children).map(td => {
-      const text = td.textContent.trim().replace(/\s+/g, ' ');
-      return '"' + text.replace(/"/g,'""') + '"';
-    }));
-    const csv = [headers.map(h=>`"${h.replace(/"/g,'""')}"`).join(',')]
-      .concat(data.map(row => row.join(',')))
-      .concat('')
+    const rows = Array.from(document.querySelectorAll('#historyBody tr'));
+    const csv = [headers.map(h => `"${h}"`).join(',')]
+      .concat(rows.map(tr => Array.from(tr.children).map(td => `"${td.textContent.trim().replace(/"/g, '""')}"`).join(',')))
       .join('\r\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href = url; a.download = 'volunteer_history.csv';
     document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-  });
-});
-</script>
-
-<script>
-// Submit to backend on change so filters combine and stay sticky
-document.addEventListener('DOMContentLoaded', function () {
-  const form = document.getElementById('filterForm');
-  if (!form) return;
-
-  form.addEventListener('change', function () {
-    if (form.requestSubmit) form.requestSubmit(); else form.submit();
   });
 });
 </script>
