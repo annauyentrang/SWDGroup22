@@ -233,134 +233,211 @@ def match_volunteer(request):
 
 
 
-VOLUNTEERS = {
-    "1": "Nareh Hovhanesian",
-    "2": "Katia Qahwajian",
-    "3": "Simon Zhamkochyan",
-    "4": "Anglina Samsonyan",
-}
-
-HISTORY = [
-    {
-        "volunteer": "1",
-        "volunteer_name": VOLUNTEERS["1"],
-        "event_name": "Park Cleanup",
-        "event_description": "Neighborhood park litter & brush removal.",
-        "location": "Memorial Park, Houston TX",
-        "required_skills": ["Lifting", "Driving"],
-        "urgency": "High",
-        "event_date": date(2025, 9, 28),
-        "capacity": "0 / 25",
-        "languages": ["English", "Vietnamese"],
-        "status": "Registered",
-    },
-    {
-        "volunteer": "2",
-        "volunteer_name": VOLUNTEERS["2"],
-        "event_name": "Blood Donation Desk",
-        "event_description": "Check-in and refreshments table.",
-        "location": "Community Center, Suite B",
-        "required_skills": ["Customer Service", "Organization"],
-        "urgency": "Medium",
-        "event_date": date(2025, 10, 5),
-        "capacity": "12 / 15",
-        "languages": ["English"],
-        "status": "Attended",
-    },
-    {
-        "volunteer": "1",
-        "volunteer_name": VOLUNTEERS["1"],
-        "event_name": "Food Drive Sorting",
-        "event_description": "Sort non-perishables; label and stock shelves.",
-        "location": "St. Mary’s Hall",
-        "required_skills": ["Lifting", "Inventory"],
-        "urgency": "Low",
-        "event_date": date(2025, 10, 19),
-        "capacity": "30 / 40",
-        "languages": ["English", "Spanish"],
-        "status": "No-Show",
-    },
-    {
-        "volunteer": "4",
-        "volunteer_name": VOLUNTEERS["4"],
-        "event_name": "Shelter Meal Prep",
-        "event_description": "Prep and package warm meals for families.",
-        "location": "Hope Shelter Kitchen",
-        "required_skills": ["Cooking", "Organization"],
-        "urgency": "High",
-        "event_date": date(2025, 10, 22),
-        "capacity": "8 / 12",
-        "languages": ["English"],
-        "status": "Cancelled",
-    },
-    
-]
 
 @login_required
 def volunteer_history(request):
-    v = (request.GET.get("volunteer") or "").strip()
-    s = (request.GET.get("status") or "").strip()
-    f = (request.GET.get("from") or "").strip()
-    t = (request.GET.get("to") or "").strip()
+    if request.GET.get("reset") == "1":
+        return redirect(request.path)
 
-    def parse(d: str):
-        try:
-            return datetime.strptime(d, "%Y-%m-%d").date()
-        except Exception:
+    # Filters from the query string
+    volunteer = (request.GET.get("volunteer") or "").strip()  # using volunteer_name as value
+    status    = (request.GET.get("status") or "").strip()
+    from_str = (request.GET.get("from_date") or "").strip()
+    def _parse_date(s):
+        if not s:
             return None
+        for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%Y/%m/%d"):
+            try:
+                return _dt.strptime(s, fmt).date()
+            except ValueError:
+                pass
+        return None
+    d_from = _parse_date(from_str)
+    # Base queryset: sort by date then name (display order only; no date filtering)
+    qs = VP.objects.all()
 
-    fdate, tdate = parse(f), parse(t)
+    if volunteer:
+        qs = qs.filter(volunteer_name=volunteer)
+    if status:
+        qs = qs.filter(status=status)
+    if d_from:
+        qs = qs.filter(event_date=d_from)
+    qs = qs.order_by("event_date", "volunteer_name")
 
+    if request.GET.get("export") == "1":
+        try:
+            headers = [
+            "Volunteer", "Event Name", "Description", "Location",
+            "Required Skills", "Urgency", "Event Date",
+            "Capacity (current / total)", "Languages", "Status"
+            ]
+            filename = "volunteer_participation"
+            if volunteer:
+                filename += f"_{volunteer}"
+            if status:
+                filename += f"_{status}"
+            stamp = now().strftime("%Y%m%d-%H%M%S")
+            from openpyxl import Workbook
+            from openpyxl.utils import get_column_letter
+            from openpyxl.styles import Font, Alignment
+
+            wb = Workbook()
+            ws = wb.active
+            ws.title = "Volunteer Participation"
+            ws.append(headers)
+        
+            # Apply header style
+            for cell in ws[1]:
+                cell.font = Font(bold=True)
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+
+            for rec in qs:
+                ws.append([
+                    rec.volunteer_name,
+                    rec.event_name,
+                    rec.description or "",
+                    rec.location or "",
+                    ", ".join([s.strip() for s in (rec.required_skills or "").split(",") if s.strip()]),
+                    rec.urgency,
+                    rec.event_date.strftime("%Y-%m-%d") if rec.event_date else "",
+                    f"{rec.capacity_current} / {rec.capacity_total}",
+                    ", ".join([s.strip() for s in (rec.languages or "").split(",") if s.strip()]),
+                    rec.status,
+                ])
+
+            # Autofit-ish column widths
+            for col_idx in range(1, ws.max_column + 1):
+                col_letter = get_column_letter(col_idx)
+                max_len = max(len(str(c.value or "")) for c in ws[col_letter])
+                ws.column_dimensions[col_letter].width = min(50, max(12, max_len + 2))
+
+            # Stream workbook
+            bio = BytesIO()
+            wb.save(bio)
+            bio.seek(0)
+            timestamp = now().strftime("%Y%m%d-%H%M%S")
+            resp = HttpResponse(
+                bio.read(),
+                content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+            resp["Content-Disposition"] = f'attachment; filename="{filename}_{stamp}.xlsx"'
+            return resp
+
+        except ImportError:
+            import csv
+            from io import StringIO
+            sio = StringIO()
+            writer = csv.writer(sio)
+            writer.writerow(headers)
+            for rec in qs:
+                writer.writerow([
+                    rec.volunteer_name,
+                    rec.event_name,
+                    rec.description or "",
+                    rec.location or "",
+                    rec.required_skills,
+                    rec.urgency,
+                    rec.event_date.strftime("%Y-%m-%d") if rec.event_date else "",
+                    f"{rec.capacity_current} / {rec.capacity_total}",
+                    rec.languages or "",
+                    rec.status,
+                ])
+            resp = HttpResponse(sio.getvalue(), content_type="text/csv")
+            resp["Content-Disposition"] = f'attachment; filename="{filename}_{stamp}.csv"'
+            return resp
+    # Distinct volunteer names -> objects with id/full_name for your template
+    names = list(
+        VP.objects.order_by().values_list("volunteer_name", flat=True).distinct()
+    )
+    volunteers = [SimpleNamespace(id=n, full_name=n) for n in names]
+
+    # Status options (from DB, fallback to defaults)
+    statuses = list(
+        VP.objects.order_by().values_list("status", flat=True).distinct()
+    )
+    statuses = sorted([s for s in statuses if s]) or ["Registered", "Attended", "No-Show", "Cancelled"]
+
+    # Shape rows for the template
     rows = []
-    for r in HISTORY:
-        if v and r["volunteer"] != v:
-            continue
-        if s and r["status"] != s:
-            continue
-        if fdate and r["event_date"] < fdate:
-            continue
-        if tdate and r["event_date"] > tdate:
-            continue
-        rows.append(r)
-
-    rows.sort(key=lambda x: x["event_date"], reverse=True)
-    volunteers_list = [{"id": k, "name": vname} for k, vname in VOLUNTEERS.items()]
+    for r in qs:
+        rows.append({
+            "id": r.id,
+            "volunteer_id": r.volunteer_name,  # using name as identifier
+            "volunteer_name": r.volunteer_name,
+            "event_name": r.event_name,
+            "description": r.description,
+            "location": r.location,
+            "required_skills": [s.strip() for s in (r.required_skills or "").split(",") if s.strip()],
+            "urgency": r.urgency,
+            "event_date": r.event_date,
+            "event_date_iso": r.event_date.isoformat() if r.event_date else "",
+            "capacity": f"{r.capacity_current} / {r.capacity_total}",
+            "languages": [l.strip() for l in (r.languages or "").split(",") if l.strip()],
+            "status": r.status,
+        })
 
     return render(
         request,
         "volunteer_history.html",
         {
             "rows": rows,
-            "volunteers": volunteers_list,
-            "filters": {"volunteer": v, "status": s, "from": f, "to": t},
+            "volunteers": volunteers,
+            "statuses": statuses,
+            "count": len(rows),
+            "filter": {  # NOTE: the template we set up earlier expects "filter", not "filters"
+                "volunteer": volunteer,
+                "status": status,
+                "from_date": d_from.isoformat() if d_from else "",
+            },
         },
     )
 
+log = logging.getLogger(__name__)
 @login_required
 def profile_form(request):
+    # Try to load existing profile for this user
+    log.info("Using DB: %s", settings.DATABASES["default"]["NAME"])
+    try:
+        profile = getattr(request.user, "profile", None)
+    except Profile.DoesNotExist:
+        profile = None
+
     if request.method == "POST":
-        form = UserProfileForm(request.POST)
+        form = ProfileForm(request.POST, instance=profile)
+
+        posted_availability = request.POST.getlist("availability[]")  # e.g. ["2025-11-02", ...]
+        posted_skills = request.POST.getlist("skills")                # matches <select multiple name="skills">
+
         if form.is_valid():
-            cleaned = form.cleaned_data.copy()
-            cleaned["availability"] = [d.isoformat() for d in cleaned["availability"]]
-            # Persist later via DB; for now store in session
-            request.session["last_profile"] = cleaned
-            messages.success(request, "Profile saved (validated on backend).")
+            prof = form.save(commit=False)
+            prof.user = request.user
+            prof.skills = posted_skills
+            prof.availability = posted_availability
+            prof.save()
+            messages.success(request, "Profile saved to the database.")
             return redirect("profile_form")
-        messages.error(request, "Please fix the errors below.")
+        else:
+            # show what failed in server logs
+            log.warning("ProfileForm errors: %s", form.errors)
+            messages.error(request, "Please fix the errors below.")
+        selected_state = request.POST.get("state") or ""
+        selected_skills = set(posted_skills)
+        existing_availability = posted_availability
     else:
-        initial = request.session.get("last_profile")
-        form = UserProfileForm(initial=initial)
+        # GET: prefill
+        form = ProfileForm(instance=profile)
+        selected_state = form.initial.get("state", "") if form.initial else ""
+        selected_skills = set(profile.skills if profile else [])
+        existing_availability = profile.availability if profile else []
 
-    selected_state = (request.POST.get("state")
-                      if request.method == "POST"
-                      else (form.initial or {}).get("state"))
-    selected_skills = set(request.POST.getlist("skills")) if request.method == "POST" \
-                      else set((form.initial or {}).get("skills", []))
-
-
-    ctx = {"form": form, "STATE_CHOICES": STATE_CHOICES, "SKILL_CHOICES": SKILL_CHOICES, "selected_state": selected_state,
-        "selected_skills": selected_skills,}
+    ctx = {
+        "form": form,
+        "STATE_CHOICES": STATE_CHOICES,
+        "SKILL_CHOICES": SKILL_CHOICES,
+        "selected_state": selected_state,
+        "selected_skills": selected_skills,
+        "existing_availability": existing_availability,
+    }
     return render(request, "profile_form.html", ctx)
 
 @login_required
@@ -380,5 +457,5 @@ def event_form(request):
     selected_required_skills = set(request.POST.getlist("required_skills")) if request.method == "POST" else set()
     selected_urgency = request.POST.get("urgency") if request.method == "POST" else None
 
-    ctx = {"form": form, "SKILL_CHOICES": SKILL_CHOICES, "URGENCY_CHOICES": URGENCY_CHOICES, "selected_required_skills": selected_required_skills, "selected_urgency": selected_urgency,}
+    ctx = {"form": form, "SKILL_CHOICES": SKILL_CHOICES, "selected_required_skills": selected_required_skills, "selected_urgency": selected_urgency,}
     return render(request, "event_form.html", ctx)
