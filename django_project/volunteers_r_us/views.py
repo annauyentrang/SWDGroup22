@@ -1,11 +1,10 @@
 from django.shortcuts import render, redirect
 from django.http import HttpResponse
+from types import SimpleNamespace
 from django.contrib.auth import get_user_model
 from .models import Notification
-
 from datetime import datetime, date
 from datetime import date
-from django.shortcuts import render
 from django.shortcuts import render
 from .models import Notification
 from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout, get_user_model
@@ -14,13 +13,14 @@ from django.core.exceptions import ValidationError
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
-rom io import BytesIO
+from io import BytesIO
 from datetime import datetime as _dt
 from .models import Profile
 from .forms import ProfileForm, EventForm, STATE_CHOICES, SKILL_CHOICES
 import logging
 from django.conf import settings
-
+from .models import VolunteerParticipation as VP
+from django.utils.timezone import now
 User = get_user_model()
 
 def home(request):
@@ -235,9 +235,6 @@ def match_volunteer(request):
         "match_reason": match_reason, "warnings": warnings, "saved": saved, "errors": errors,
     }
     return render(request, "match_form.html", ctx)
-
-
-
 
 @login_required
 def volunteer_history(request):

@@ -1,6 +1,7 @@
 from datetime import date
 from django import forms
 from django.core.validators import RegexValidator
+from .models import Profile
 from .choices import STATE_CHOICES, SKILL_CHOICES
 
 
