@@ -1,6 +1,8 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from .models import User, Notification
+from .models import VolunteerParticipation
+from .models import Profile
 
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
@@ -34,4 +36,16 @@ class AssignmentAdmin(admin.ModelAdmin):
     list_display = ("id","volunteer_id","volunteer_name","event_id","event_title","status","notify","override","created_by","created_at")
     list_filter = ("status","notify","override","created_at")
     search_fields = ("volunteer_id","volunteer_name","event_id","event_title","match_reason","admin_notes")
+    
+@admin.register(Profile)
+class ProfileAdmin(admin.ModelAdmin):
+    list_display = ("user", "full_name", "city", "state", "zipcode", "updated_at")
+    search_fields = ("user__email", "full_name", "city", "zipcode")
+
+
+@admin.register(VolunteerParticipation)
+class VolunteerParticipationAdmin(admin.ModelAdmin):
+    list_display  = ("volunteer_name", "event_name", "event_date", "urgency", "status", "capacity_current", "capacity_total")
+    list_filter   = ("urgency", "status", "event_date")
+    search_fields = ("volunteer_name", "event_name", "location", "languages", "required_skills")
 
