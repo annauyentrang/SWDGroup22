@@ -1,7 +1,7 @@
 from datetime import date
 from django import forms
 from django.core.validators import RegexValidator
-from .models import Profile
+from .models import Profile, Skill, Event
 from .choices import STATE_CHOICES, SKILL_CHOICES
 
 
@@ -56,10 +56,21 @@ class UserProfileForm(forms.Form):
                 raise forms.ValidationError(f"Invalid date: {s}")
         return parsed
 
-class EventForm(forms.Form):
-    event_name = forms.CharField(max_length=100, required=True)
-    event_description = forms.CharField(widget=forms.Textarea, required=True)
-    location = forms.CharField(widget=forms.Textarea, required=True)
-    required_skills = forms.MultipleChoiceField(choices=SKILL_CHOICES, required=True)
-    urgency = forms.ChoiceField(choices=URGENCY_CHOICES, required=True)
-    event_date = forms.DateField(required=True, input_formats=["%Y-%m-%d"])
+class EventForm(forms.ModelForm):
+    required_skills = forms.ModelMultipleChoiceField(
+        queryset=Skill.objects.all(), required=False
+    )
+    class Meta:
+        model = Event
+        fields = ["name", "description", "location", "required_skills", "urgency", "event_date"]
+        widgets = {
+            "description": forms.Textarea(attrs={"rows": 4}),
+            "location": forms.Textarea(attrs={"rows": 2}),
+            "event_date": forms.DateInput(attrs={"type": "date"}),
+        }
+        labels = {
+            "name": "Event Name",
+            "description": "Event Description",
+            "required_skills": "Required Skills",
+            "event_date": "Event Date",
+        }

@@ -1,8 +1,8 @@
 from django.shortcuts import render, redirect
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from types import SimpleNamespace
 from django.contrib.auth import get_user_model
-from .models import Notification
+from .models import Notification, Skill, Event
 from datetime import datetime, date
 from datetime import date
 from django.shortcuts import render
@@ -287,7 +287,7 @@ def volunteer_history(request):
             ws = wb.active
             ws.title = "Volunteer Participation"
             ws.append(headers)
-        
+
             # Apply header style
             for cell in ws[1]:
                 cell.font = Font(bold=True)
@@ -461,3 +461,32 @@ def event_form(request):
 
     ctx = {"form": form, "SKILL_CHOICES": SKILL_CHOICES, "selected_required_skills": selected_required_skills, "selected_urgency": selected_urgency,}
     return render(request, "event_form.html", ctx)
+
+# Send Event Form info to database
+def event_form(request):
+    if request.method == "POST":
+        form = EventForm(request.POST)
+        if form.is_valid():
+            event = form.save()
+
+            # If the form was submitted via fetch/AJAX, return JSON
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse({
+                    "id": event.id,
+                    "name": event.name,
+                    "description": event.description,
+                    "location": event.location,
+                    "urgency": event.urgency,
+                    "event_date": event.event_date.isoformat(),
+                    # convert M2M queryset → list of dicts
+                    "required_skills": list(
+                        event.required_skills.values("id", "name")
+                    ),
+                })
+
+            # Normal HTML POST → redirect
+            return redirect("home")
+    else:
+        form = EventForm()
+
+    return render(request, "event_form.html", {"form": form})

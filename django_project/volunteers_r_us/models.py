@@ -1,5 +1,6 @@
-from django.db import models
+# volunteers_r_us/models.py
 from django.conf import settings
+from django.db import models
 from django.utils import timezone
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseUserManager
 
@@ -32,33 +33,43 @@ class UserManager(BaseUserManager):
 class User(AbstractBaseUser, PermissionsMixin):
     email = models.EmailField(unique=True, max_length=254)
     first_name = models.CharField(max_length=150, blank=True)
-    last_name = models.CharField(max_length=150, blank=True)
-    is_active = models.BooleanField(default=True)
-    is_staff = models.BooleanField(default=False)
+    last_name  = models.CharField(max_length=150, blank=True)
+    is_active  = models.BooleanField(default=True)
+    is_staff   = models.BooleanField(default=False)
     date_joined = models.DateTimeField(default=timezone.now)
 
     objects = UserManager()
 
-    USERNAME_FIELD = "email"
+    USERNAME_FIELD  = "email"
     REQUIRED_FIELDS = []
 
     def __str__(self):
         return self.email
 
+
+# ---------------------------
+# Core Domain
+# ---------------------------
 class Skill(models.Model):
-    name = models.CharField(max_length=80, unique=True)
+    name = models.CharField(max_length=100, unique=True)
     def __str__(self): return self.name
 
-URGENCY = [("L","Low"),("M","Medium"),("H","High")]
 
 class Event(models.Model):
+    class Urgency(models.TextChoices):
+        LOW    = "low", "Low"
+        MEDIUM = "medium", "Medium"
+        HIGH   = "high", "High"
+
     name = models.CharField(max_length=100)
     description = models.TextField()
-    location = models.CharField(max_length=200)
-    required_skills = models.ManyToManyField(Skill, related_name="events")
-    urgency = models.CharField(max_length=1, choices=URGENCY)
+    location = models.CharField(max_length=255)
+    required_skills = models.ManyToManyField(Skill, related_name="events", blank=True)
+    urgency = models.CharField(max_length=10, choices=Urgency.choices)
     event_date = models.DateField()
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
     def __str__(self): return self.name
 
 
@@ -67,56 +78,44 @@ class VolunteerProfile(models.Model):
     skills = models.ManyToManyField(Skill, related_name="volunteers", blank=True)
     def __str__(self): return f"{self.user}"
 
+
 class Match(models.Model):
-    PENDING, CONFIRMED, DECLINED = "P","C","D"
-    STATUS_CHOICES = [(PENDING,"pending"),(CONFIRMED,"confirmed"),(DECLINED,"declined")]
-    volunteer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="matches")
-    event     = models.ForeignKey(Event, on_delete=models.CASCADE, related_name="matches")
-    status    = models.CharField(max_length=1, choices=STATUS_CHOICES, default=PENDING)
+    PENDING, CONFIRMED, DECLINED = "P", "C", "D"
+    STATUS_CHOICES = [(PENDING, "pending"), (CONFIRMED, "confirmed"), (DECLINED, "declined")]
+
+    volunteer  = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="matches")
+    event = models.ForeignKey("Event", on_delete=models.CASCADE, null=True, blank=True)
+    status     = models.CharField(max_length=1, choices=STATUS_CHOICES, default=PENDING)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ("volunteer","event")  # prevent duplicate matches
-        indexes = [models.Index(fields=["volunteer","event"]), models.Index(fields=["status"])]
+        constraints = [
+            models.UniqueConstraint(fields=["volunteer", "event"], name="uq_match_volunteer_event")
+        ]
+        indexes = [
+            models.Index(fields=["volunteer", "event"]),
+            models.Index(fields=["status"]),
+        ]
+
 
 # ---------------------------
-# Notification Model
+# Notification
 # ---------------------------
 class Notification(models.Model):
-    # Keep nullable so migrations don't ask for a default for legacy NULL rows.
-    user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        null=True,
-        blank=True,
-    )
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, null=True, blank=True)
     message = models.TextField()
     created_at = models.DateTimeField(default=timezone.now, db_index=True)
 
     class Meta:
-        ordering = ['-created_at']
+        ordering = ["-created_at"]
 
     def __str__(self):
         return f"Notification for {self.user} at {self.created_at}"
 
 
-
-
-    
-
-
-
-
-
-
 # ---------------------------
-# Assignment Model
+# Assignment (now using FKs)
 # ---------------------------
-
-# models.py
-from django.conf import settings
-from django.db import models
-
 class Assignment(models.Model):
     ASSIGNED  = "assigned"
     ATTENDED  = "attended"
@@ -129,10 +128,11 @@ class Assignment(models.Model):
         (CANCELLED, "Cancelled"),
     ]
 
-    # Using raw ids/titles because you said you don't have Volunteer/Event models yet
-    volunteer_id   = models.CharField(max_length=64)
+    volunteer   = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="assignments")
+    event       = models.ForeignKey(Event, on_delete=models.CASCADE, related_name="assignments")
+
+    # optional denormalized display fields
     volunteer_name = models.CharField(max_length=255, blank=True)
-    event_id       = models.CharField(max_length=64)
     event_title    = models.CharField(max_length=255, blank=True)
 
     status   = models.CharField(max_length=20, choices=STATUS_CHOICES, default=ASSIGNED)
@@ -143,22 +143,28 @@ class Assignment(models.Model):
 
     match_score  = models.FloatField(default=0)
     match_reason = models.TextField(blank=True)
-    warnings     = models.JSONField(default=list, blank=True)  # OK on Django 3.1+
+    warnings     = models.JSONField(default=list, blank=True)
 
-    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name="created_assignments")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        unique_together = ("volunteer_id", "event_id")
+        constraints = [
+            models.UniqueConstraint(fields=["volunteer", "event"], name="uq_assignment_volunteer_event")
+        ]
         indexes = [
-            models.Index(fields=["event_id", "status"]),
-            models.Index(fields=["volunteer_id"]),
+            models.Index(fields=["event", "status"]),
+            models.Index(fields=["volunteer"]),
         ]
 
     def __str__(self):
-        return f"{self.volunteer_id} → {self.event_id} ({self.status})"
+        return f"{self.volunteer} → {self.event} ({self.status})"
 
+
+# ---------------------------
+# Reporting/Denormalized Table
+# ---------------------------
 class VolunteerParticipation(models.Model):
     class Urgency(models.TextChoices):
         LOW = "Low", "Low"
@@ -167,9 +173,9 @@ class VolunteerParticipation(models.Model):
 
     class Status(models.TextChoices):
         REGISTERED = "Registered", "Registered"
-        ATTENDED = "Attended", "Attended"
-        NO_SHOW = "No-Show", "No-Show"
-        CANCELLED = "Cancelled", "Cancelled"
+        ATTENDED   = "Attended", "Attended"
+        NO_SHOW    = "No-Show", "No-Show"
+        CANCELLED  = "Cancelled", "Cancelled"
 
     volunteer_name   = models.CharField(max_length=100)
     event_name       = models.CharField(max_length=120)
@@ -190,13 +196,11 @@ class VolunteerParticipation(models.Model):
     def __str__(self):
         return f"{self.volunteer_name} – {self.event_name} ({self.event_date})"
 
-class Profile(models.Model):
-    user = models.OneToOneField(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name="profile",
-    )
 
+# ---------------------------
+# User Profile
+# ---------------------------
+class Profile(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="profile")
     full_name = models.CharField(max_length=50)
     address1  = models.CharField(max_length=100)
@@ -204,27 +208,14 @@ class Profile(models.Model):
     city      = models.CharField(max_length=100)
     state     = models.CharField(max_length=2)
     zipcode   = models.CharField(max_length=10)
-    skills        = models.JSONField(default=list)
-    preferences   = models.TextField(blank=True)
-    availability  = models.JSONField(default=list)
-    created_at    = models.DateTimeField(auto_now_add=True)
-    updated_at    = models.DateTimeField(auto_now=True)
 
-    # Store list of skill codes (e.g., ["FIRST_AID","CARPENTRY"])
-    skills = models.JSONField(default=list)
-
-    preferences = models.TextField(blank=True)
-
-    # Store list of ISO dates (e.g., ["2025-11-02", "2025-11-09"])
+    # lists like ["FIRST_AID","CARPENTRY"] and ["2025-11-02","2025-11-09"]
+    skills       = models.JSONField(default=list)
+    preferences  = models.TextField(blank=True)
     availability = models.JSONField(default=list)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    #def skill_labels(self):
-        #label_map = dict(SKILL_CHOICES)
-        #return [label_map.get(code, code) for code in self.skills]
-
     def __str__(self):
         return f"Profile<{self.user}>"
-
