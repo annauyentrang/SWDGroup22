@@ -159,5 +159,72 @@ class Assignment(models.Model):
     def __str__(self):
         return f"{self.volunteer_id} → {self.event_id} ({self.status})"
 
+class VolunteerParticipation(models.Model):
+    class Urgency(models.TextChoices):
+        LOW = "Low", "Low"
+        MEDIUM = "Medium", "Medium"
+        HIGH = "High", "High"
 
+    class Status(models.TextChoices):
+        REGISTERED = "Registered", "Registered"
+        ATTENDED = "Attended", "Attended"
+        NO_SHOW = "No-Show", "No-Show"
+        CANCELLED = "Cancelled", "Cancelled"
+
+    volunteer_name   = models.CharField(max_length=100)
+    event_name       = models.CharField(max_length=120)
+    description      = models.TextField(blank=True, default="—")
+    location         = models.CharField(max_length=160)
+    required_skills  = models.CharField(max_length=160, help_text="Comma-separated (e.g., Cooking,Organization)")
+    urgency          = models.CharField(max_length=6, choices=Urgency.choices)
+    event_date       = models.DateField()
+    capacity_current = models.PositiveIntegerField(default=0)
+    capacity_total   = models.PositiveIntegerField()
+    languages        = models.CharField(max_length=160, help_text="Comma-separated (e.g., English,Spanish)")
+    status           = models.CharField(max_length=10, choices=Status.choices)
+
+    class Meta:
+        db_table = "volunteer_participation"
+        ordering = ["event_date", "volunteer_name"]
+
+    def __str__(self):
+        return f"{self.volunteer_name} – {self.event_name} ({self.event_date})"
+
+class Profile(models.Model):
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="profile",
+    )
+
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="profile")
+    full_name = models.CharField(max_length=50)
+    address1  = models.CharField(max_length=100)
+    address2  = models.CharField(max_length=100, blank=True)
+    city      = models.CharField(max_length=100)
+    state     = models.CharField(max_length=2)
+    zipcode   = models.CharField(max_length=10)
+    skills        = models.JSONField(default=list)
+    preferences   = models.TextField(blank=True)
+    availability  = models.JSONField(default=list)
+    created_at    = models.DateTimeField(auto_now_add=True)
+    updated_at    = models.DateTimeField(auto_now=True)
+
+    # Store list of skill codes (e.g., ["FIRST_AID","CARPENTRY"])
+    skills = models.JSONField(default=list)
+
+    preferences = models.TextField(blank=True)
+
+    # Store list of ISO dates (e.g., ["2025-11-02", "2025-11-09"])
+    availability = models.JSONField(default=list)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    #def skill_labels(self):
+        #label_map = dict(SKILL_CHOICES)
+        #return [label_map.get(code, code) for code in self.skills]
+
+    def __str__(self):
+        return f"Profile<{self.user}>"
 
