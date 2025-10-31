@@ -128,8 +128,12 @@ class Assignment(models.Model):
         (CANCELLED, "Cancelled"),
     ]
 
-    volunteer   = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="assignments")
-    event       = models.ForeignKey(Event, on_delete=models.CASCADE, related_name="assignments")
+    volunteer = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.CASCADE, related_name="assignments"
+    )
+    event = models.ForeignKey(
+        "Event", null=True, blank=True, on_delete=models.CASCADE, related_name="assignments"
+    )
 
     # optional denormalized display fields
     volunteer_name = models.CharField(max_length=255, blank=True)

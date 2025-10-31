@@ -4,12 +4,10 @@ from django.core.validators import RegexValidator
 from .models import Profile, Skill, Event
 from .choices import STATE_CHOICES, SKILL_CHOICES
 
-
 URGENCY_CHOICES = [
     ("low", "Low"),
     ("medium", "Medium"),
     ("high", "High"),
-    ("critical", "Critical"),
 ]
 
 zip_validator = RegexValidator(
@@ -58,19 +56,23 @@ class UserProfileForm(forms.Form):
 
 class EventForm(forms.ModelForm):
     required_skills = forms.ModelMultipleChoiceField(
-        queryset=Skill.objects.all(), required=False
+        queryset=Skill.objects.none(),
+        required=False,
+        widget=forms.SelectMultiple(attrs={"class": "form-select", "id": "id_required_skills"})
     )
+
     class Meta:
         model = Event
         fields = ["name", "description", "location", "required_skills", "urgency", "event_date"]
         widgets = {
-            "description": forms.Textarea(attrs={"rows": 4}),
-            "location": forms.Textarea(attrs={"rows": 2}),
-            "event_date": forms.DateInput(attrs={"type": "date"}),
+            "name": forms.TextInput(attrs={"class": "form-control", "id": "id_name", "maxlength": 100}),
+            "description": forms.Textarea(attrs={"class": "form-control", "id": "id_description", "rows": 4}),
+            "location": forms.Textarea(attrs={"class": "form-control", "id": "id_location", "rows": 2}),
+            "urgency": forms.Select(attrs={"class": "form-select", "id": "id_urgency"}),
+            "event_date": forms.DateInput(attrs={"type": "date", "class": "form-control", "id": "id_event_date"}),
         }
-        labels = {
-            "name": "Event Name",
-            "description": "Event Description",
-            "required_skills": "Required Skills",
-            "event_date": "Event Date",
-        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # populate from DB
+        self.fields["required_skills"].queryset = Skill.objects.order_by("name")

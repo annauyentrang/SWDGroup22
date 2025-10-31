@@ -444,49 +444,9 @@ def profile_form(request):
 
 @login_required
 def event_form(request):
-    if request.method == "POST":
-        form = EventForm(request.POST)
-        if form.is_valid():
-            cleaned = form.cleaned_data.copy()
-            request.session.setdefault("events", [])
-            request.session["events"] = request.session["events"] + [cleaned]
-            messages.success(request, "Event created (validated on backend).")
-            return redirect("event_form")
-        messages.error(request, "Please fix the errors below.")
-    else:
-        form = EventForm()
-
-    selected_required_skills = set(request.POST.getlist("required_skills")) if request.method == "POST" else set()
-    selected_urgency = request.POST.get("urgency") if request.method == "POST" else None
-
-    ctx = {"form": form, "SKILL_CHOICES": SKILL_CHOICES, "selected_required_skills": selected_required_skills, "selected_urgency": selected_urgency,}
-    return render(request, "event_form.html", ctx)
-
-# Send Event Form info to database
-def event_form(request):
-    if request.method == "POST":
-        form = EventForm(request.POST)
-        if form.is_valid():
-            event = form.save()
-
-            # If the form was submitted via fetch/AJAX, return JSON
-            if request.headers.get("x-requested-with") == "XMLHttpRequest":
-                return JsonResponse({
-                    "id": event.id,
-                    "name": event.name,
-                    "description": event.description,
-                    "location": event.location,
-                    "urgency": event.urgency,
-                    "event_date": event.event_date.isoformat(),
-                    # convert M2M queryset → list of dicts
-                    "required_skills": list(
-                        event.required_skills.values("id", "name")
-                    ),
-                })
-
-            # Normal HTML POST → redirect
-            return redirect("home")
-    else:
-        form = EventForm()
-
+    form = EventForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        event = form.save()
+        # If you need JSON for AJAX, add a branch here.
+        return redirect("home")
     return render(request, "event_form.html", {"form": form})
