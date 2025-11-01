@@ -2,11 +2,11 @@ from django.shortcuts import render, redirect
 from django.http import HttpResponse, JsonResponse
 from types import SimpleNamespace
 from django.contrib.auth import get_user_model
-from .models import Notification, Skill, Event
+from .models import Skill, Event
 from datetime import datetime, date
 from datetime import date
 from django.shortcuts import render
-from .models import Notification
+from notify.models import Notification
 from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout, get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
@@ -93,148 +93,9 @@ def logout_view(request):
     auth_logout(request)
     return redirect("home")
 
-@login_required
-def profile_form(request):
-    return render(request, "profile_form.html")
-
-@login_required
-def event_form(request):
-    return render(request, "event_form.html")
-
 #@login_required
 # volunteers_r_us/views.py
 from django.shortcuts import render
-
-# volunteers_r_us/views.py
-from django.shortcuts import render
-from .models import Notification
-
-from .matching.data import VOLUNTEERS as VDATA, EVENTS as EDATA
-from .matching.logic import score, volunteer_to_dict, event_to_dict
-
-from django.contrib.auth.decorators import login_required
-from django.shortcuts import render
-from django.contrib import messages
-from .models import Assignment
-
-@login_required
-def match_volunteer(request):
-    # pull from your in-memory demo data
-    from .matching.data import VOLUNTEERS as VDATA, EVENTS as EDATA
-
-    def _slot_from_timeblocks(tb):
-        return next(iter(tb), "")
-
-    def _vol_to_view(v):
-        return {
-            "id": v.id,
-            "name": v.name,
-            "skills": sorted(v.skills),
-            "languages": sorted(v.languages),
-            "availability": sorted(v.availability),
-            "location_radius_miles": getattr(v, "radius_miles", 0),
-            "certifications": sorted(getattr(v, "certifications", [])),
-            "constraints": sorted(getattr(v, "constraints", [])),
-        }
-
-    def _event_to_view(e):
-        return {
-            "id": e.id,
-            "title": e.title,
-            "required_skills": sorted(e.required_skills),
-            "nice_skills": [],
-            "slot": _slot_from_timeblocks(e.time_blocks),
-            "date": "TBD",
-            "location": "TBD",
-            "capacity_remaining": 5,
-            "min_age": 0,
-            "bg_check": False,
-        }
-
-    volunteers = [_vol_to_view(v) for v in VDATA]
-    events     = [_event_to_view(e) for e in EDATA]
-
-    # chosen volunteer (GET for initial load, POST preserves hidden input)
-    sel_vid = request.GET.get("volunteer_id") or request.POST.get("volunteer_id") or str(volunteers[0]["id"])
-    volunteer = next(v for v in volunteers if str(v["id"]) == str(sel_vid))
-
-    # tiny score for suggestion
-    def _score(ev, v):
-        vskills, eskills = set(v["skills"]), set(ev["required_skills"])
-        time_fit = 1 if ev["slot"] in v["availability"] else 0
-        return len(vskills & eskills) * 10 + time_fit
-
-    suggested = max(events, key=lambda e: _score(e, volunteer))
-    sel_eid   = request.POST.get("matched_event") or suggested["id"]
-    selected  = next(e for e in events if str(e["id"]) == str(sel_eid))
-
-    # compute warnings/score for display + persistence
-    vskills, eskills = set(volunteer["skills"]), set(selected["required_skills"])
-    overlap  = vskills & eskills
-    time_fit = selected["slot"] in volunteer["availability"]
-
-    warnings = []
-    missing = (eskills - vskills)
-    if selected["capacity_remaining"] <= 0:
-        warnings.append("No capacity remaining.")
-    if missing:
-        warnings.append(f"Missing required skills: {', '.join(sorted(missing))}.")
-    if not time_fit:
-        warnings.append("Volunteer not available for this time slot.")
-    if selected["bg_check"] and "Background Check" not in volunteer["certifications"]:
-        warnings.append("Background check required but not on file.")
-
-    match_score  = _score(selected, volunteer)
-    match_reason = f"{len(overlap)} skill match; time fit={time_fit}"
-
-    saved, errors = None, []
-    if request.method == "POST":
-        # require reason if override checked
-        if request.POST.get("override") == "on" and not (request.POST.get("override_reason") or "").strip():
-            errors.append("Override reason is required when override is checked.")
-
-        if not errors:
-            action = request.POST.get("action") or "assign"
-            notify = (action == "assign_notify")
-
-            # write to DB (create or update single row per volunteer/event)
-            assignment, created = Assignment.objects.update_or_create(
-                volunteer_id=str(volunteer["id"]),
-                event_id=str(selected["id"]),
-                defaults={
-                    "volunteer_name": volunteer["name"],
-                    "event_title": selected["title"],
-                    "status": Assignment.ASSIGNED,
-                    "notify": notify,
-                    "override": (request.POST.get("override") == "on"),
-                    "override_reason": (request.POST.get("override_reason") or "").strip(),
-                    "admin_notes": (request.POST.get("admin_notes") or "").strip(),
-                    "match_score": match_score,
-                    "match_reason": match_reason,
-                    "warnings": warnings,  # if TextField fallback, json.dumps(warnings)
-                    "created_by": request.user,
-                },
-            )
-
-            # keep 'saved' so your template's success box renders immediately
-            saved = {
-                "volunteer_id": str(volunteer["id"]),
-                "event_id": str(selected["id"]),
-                "notify": notify,
-                "override": (request.POST.get("override") == "on"),
-                "override_reason": (request.POST.get("override_reason") or "").strip(),
-                "admin_notes": (request.POST.get("admin_notes") or "").strip(),
-                "match_score": match_score,
-                "match_reason": match_reason,
-                "warnings": warnings,
-            }
-
-    ctx = {
-        "volunteers": volunteers, "volunteer": volunteer, "events": events,
-        "selected": selected, "suggested": suggested, "match_score": match_score,
-        "match_reason": match_reason, "warnings": warnings, "saved": saved, "errors": errors,
-    }
-    return render(request, "match_form.html", ctx)
 
 @login_required
 def volunteer_history(request):

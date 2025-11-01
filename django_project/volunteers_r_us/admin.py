@@ -2,8 +2,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from .models import (
-    User, Skill, Event, VolunteerProfile, Match,
-    Notification, Assignment, VolunteerParticipation, Profile
+    User, Skill, Event, VolunteerProfile, Match, Assignment, VolunteerParticipation, Profile
 )
 
 # ----- USER ADMIN -----
@@ -53,14 +52,6 @@ class MatchAdmin(admin.ModelAdmin):
     list_display = ("volunteer", "event", "status", "created_at")
     list_filter = ("status",)
     search_fields = ("volunteer__email", "event__name")
-
-
-@admin.register(Notification)
-class NotificationAdmin(admin.ModelAdmin):
-    list_display = ("user", "message", "created_at")
-    list_filter = ("created_at",)
-    search_fields = ("user__email", "message")
-
 
 @admin.register(Assignment)
 class AssignmentAdmin(admin.ModelAdmin):

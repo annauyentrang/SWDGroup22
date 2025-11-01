@@ -1,5 +1,5 @@
 from rest_framework import viewsets, permissions, mixins, decorators, response, status
-from .models import Notification
+from notify.models import Notification
 from .serializers import NotificationSerializer
 from rest_framework.response import Response
 from rest_framework.decorators import action

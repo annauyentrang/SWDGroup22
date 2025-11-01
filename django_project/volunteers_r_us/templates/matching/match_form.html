@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Volunteer Matching{% endblock %}
+{% block content %}
+
+<div class="row justify-content-center">
+  <div class="col-lg-9">
+    <h2 class="mb-3">Volunteer Matching</h2>
+
+    <!-- Volunteer and Event selection -->
+    <form method="get" class="card p-3 mb-4">
+      <div class="mb-3">
+        <label class="form-label" for="volunteer_id">Volunteer</label>
+        <select id="volunteer_id" name="volunteer_id" class="form-select">
+          <option value="">-- Select Volunteer --</option>
+          {% for p in volunteers %}
+            <option value="{{ p.id }}" {% if p.id == selected_volunteer_id %}selected{% endif %}>
+              {{ p.full_name|default:p.user.email }} ({{ p.city }}, {{ p.state }})
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label" for="event_id">Event</label>
+        <select id="event_id" name="event_id" class="form-select">
+          <option value="">-- Select Event --</option>
+          {% for e in events %}
+            <option value="{{ e.id }}" {% if e.id == selected_event_id %}selected{% endif %}>
+              {{ e.name }} — {{ e.event_date }} — {{ e.location }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <button class="btn btn-primary" type="submit">Load</button>
+    </form>
+
+    {% if selected_volunteer_id and selected_event_id %}
+    <!-- Assignment form -->
+    <form method="post" action="{% url 'assign_volunteer' %}" class="card p-3">
+      {% csrf_token %}
+      <input type="hidden" name="volunteer_id" value="{{ selected_volunteer_id }}">
+      <input type="hidden" name="event_id" value="{{ selected_event_id }}">
+
+      <h5 class="mb-3">Confirm Assignment</h5>
+
+      <div class="form-check form-switch mb-3">
+        <input class="form-check-input" type="checkbox" id="override" name="override">
+        <label class="form-check-label" for="override">Override warnings</label>
+      </div>
+
+      <div class="mb-3">
+        <label for="override_reason" class="form-label">Override reason</label>
+        <textarea id="override_reason" name="override_reason" class="form-control" rows="2" placeholder="Explain why you're overriding" disabled></textarea>
+      </div>
+
+      <div class="mb-3">
+        <label for="admin_notes" class="form-label">Admin notes</label>
+        <textarea id="admin_notes" name="admin_notes" class="form-control" rows="2" placeholder="Optional"></textarea>
+      </div>
+
+      <div class="d-flex justify-content-end gap-2">
+        <a href="{% url 'home' %}" class="btn btn-outline-secondary">Skip</a>
+        <button class="btn btn-primary" type="submit" name="action" value="assign">Assign</button>
+        <button class="btn btn-success" type="submit" name="action" value="assign_notify">Assign + Notify</button>
+      </div>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+  const overrideCheckbox = document.getElementById("override");
+  const reasonBox = document.getElementById("override_reason");
+  if (overrideCheckbox && reasonBox) {
+    overrideCheckbox.addEventListener("change", function () {
+      reasonBox.disabled = !this.checked;
+      if (!this.checked) reasonBox.value = "";
+    });
+  }
+</script>
+
+{% endblock %}

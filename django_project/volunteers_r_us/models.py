@@ -97,22 +97,6 @@ class Match(models.Model):
             models.Index(fields=["status"]),
         ]
 
-
-# ---------------------------
-# Notification
-# ---------------------------
-class Notification(models.Model):
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, null=True, blank=True)
-    message = models.TextField()
-    created_at = models.DateTimeField(default=timezone.now, db_index=True)
-
-    class Meta:
-        ordering = ["-created_at"]
-
-    def __str__(self):
-        return f"Notification for {self.user} at {self.created_at}"
-
-
 # ---------------------------
 # Assignment (now using FKs)
 # ---------------------------

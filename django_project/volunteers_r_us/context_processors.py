@@ -1,4 +1,5 @@
-from .models import Notification
+from notify.models import Notification
+
 
 def notifications(request):
     if not getattr(request, "user", None) or not request.user.is_authenticated:

@@ -25,8 +25,17 @@ SECRET_KEY = "django-insecure-z79$-@#g)&s0i!0-yadgpr0*^@yj79yiyest9!%y_$5b92z+pt
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["*", "localhost", "127.0.0.1"]
 
+# Add every dev origin you might use (scheme is required)
+CSRF_TRUSTED_ORIGINS = [
+    "https://localhost:8000",
+    "http://localhost:8000",
+    "https://127.0.0.1:8000",
+    "http://127.0.0.1:8000",
+    "https://*.app.github.dev",       # GitHub Codespaces
+    "https://*.githubpreview.dev",    # older Codespaces domain
+]
 
 # Application definition
 
@@ -163,3 +172,6 @@ REST_FRAMEWORK = {
         "rest_framework.permissions.IsAuthenticated",
     ],
 }
+
+EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+DEFAULT_FROM_EMAIL = "noreply@example.com"
