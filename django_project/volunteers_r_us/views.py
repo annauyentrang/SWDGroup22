@@ -6,6 +6,7 @@ from .models import Skill, Event
 from datetime import datetime, date
 from datetime import date
 from django.shortcuts import render
+from .models import Assignment
 from notify.models import Notification
 from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout, get_user_model
 from django.contrib.auth.password_validation import validate_password
@@ -19,9 +20,11 @@ from .models import Profile
 from .forms import ProfileForm, EventForm, STATE_CHOICES, SKILL_CHOICES
 import logging
 from django.conf import settings
-from .models import VolunteerParticipation as VP
+
+#from .models import VolunteerParticipation as VP
 from django.utils.timezone import now
 from django.contrib.admin.views.decorators import staff_member_required
+
 
 User = get_user_model()
 
@@ -99,147 +102,226 @@ def logout_view(request):
 # volunteers_r_us/views.py
 from django.shortcuts import render
 
+def _parse_date(s: str):
+    if not s:
+        return None
+    for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%Y/%m/%d"):
+        try:
+            return _dt.strptime(s, fmt).date()
+        except ValueError:
+            pass
+    return None
+
+
+def _skills_list(event):
+    """Return list of skill names from Event.required_skills (ManyToManyField)."""
+    if not event:
+        return []
+    return [str(skill).strip() for skill in event.required_skills.all()]
+
+
+def _csv_from_list(values):
+    return ", ".join(v for v in values if v)
+
+
 @login_required
 @staff_member_required
 def volunteer_history(request):
     if request.GET.get("reset") == "1":
         return redirect(request.path)
 
-    # Filters from the query string
-    volunteer = (request.GET.get("volunteer") or "").strip()  # using volunteer_name as value
+    # ---------- filters from query string ----------
+    volunteer = (request.GET.get("volunteer") or "").strip()  # volunteer email
     status    = (request.GET.get("status") or "").strip()
-    from_str = (request.GET.get("from_date") or "").strip()
-    def _parse_date(s):
-        if not s:
-            return None
-        for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%Y/%m/%d"):
-            try:
-                return _dt.strptime(s, fmt).date()
-            except ValueError:
-                pass
-        return None
+    from_str  = (request.GET.get("from_date") or "").strip()
+
     d_from = _parse_date(from_str)
-    # Base queryset: sort by date then name (display order only; no date filtering)
-    qs = VP.objects.all()
+
+    # Base queryset: assignments with volunteer and event joined
+    qs = Assignment.objects.select_related("volunteer", "event").all()
 
     if volunteer:
-        qs = qs.filter(volunteer_name=volunteer)
+        qs = qs.filter(volunteer__email=volunteer)
     if status:
         qs = qs.filter(status=status)
     if d_from:
-        qs = qs.filter(event_date=d_from)
-    qs = qs.order_by("event_date", "volunteer_name")
+        qs = qs.filter(event__event_date=d_from)
 
+    qs = qs.order_by("event__event_date", "volunteer__email")
+
+    # ------------------------------- export branch -------------------------------
     if request.GET.get("export") == "1":
-        try:
-            headers = [
+        headers = [
             "Volunteer", "Event Name", "Description", "Location",
             "Required Skills", "Urgency", "Event Date",
-            "Capacity (current / total)", "Languages", "Status"
-            ]
-            filename = "volunteer_participation"
-            if volunteer:
-                filename += f"_{volunteer}"
-            if status:
-                filename += f"_{status}"
-            stamp = now().strftime("%Y%m%d-%H%M%S")
+            "Capacity (current / total)", "Languages", "Status",
+        ]
+        filename = "volunteer_history"
+        if volunteer:
+            filename += f"_{volunteer}"
+        if status:
+            filename += f"_{status}"
+        stamp = now().strftime("%Y%m%d-%H%M%S")
+
+        try:
             from openpyxl import Workbook
             from openpyxl.utils import get_column_letter
             from openpyxl.styles import Font, Alignment
 
             wb = Workbook()
             ws = wb.active
-            ws.title = "Volunteer Participation"
+            ws.title = "Volunteer History"
             ws.append(headers)
 
-            # Apply header style
+            # header style
             for cell in ws[1]:
                 cell.font = Font(bold=True)
                 cell.alignment = Alignment(horizontal="center", vertical="center")
 
             for rec in qs:
+                evt = rec.event
+                volunteer_email = getattr(rec.volunteer, "email", str(rec.volunteer))
+                skills_csv = _csv_from_list(_skills_list(evt))
+
+                # No capacity/languages fields in Event yet: use placeholders
+                cap_current = 0
+                cap_total   = 0
+                languages_csv = ""
+
                 ws.append([
-                    rec.volunteer_name,
-                    rec.event_name,
-                    rec.description or "",
-                    rec.location or "",
-                    ", ".join([s.strip() for s in (rec.required_skills or "").split(",") if s.strip()]),
-                    rec.urgency,
-                    rec.event_date.strftime("%Y-%m-%d") if rec.event_date else "",
-                    f"{rec.capacity_current} / {rec.capacity_total}",
-                    ", ".join([s.strip() for s in (rec.languages or "").split(",") if s.strip()]),
+                    volunteer_email,
+                    getattr(evt, "name", "") if evt else "",
+                    getattr(evt, "description", "") if evt else "",
+                    getattr(evt, "location", "") if evt else "",
+                    skills_csv,
+                    getattr(evt, "urgency", "") if evt else "",
+                    evt.event_date.strftime("%Y-%m-%d") if (evt and evt.event_date) else "",
+                    f"{cap_current} / {cap_total}",
+                    languages_csv,
                     rec.status,
                 ])
 
-            # Autofit-ish column widths
+            # rough autofit
             for col_idx in range(1, ws.max_column + 1):
                 col_letter = get_column_letter(col_idx)
                 max_len = max(len(str(c.value or "")) for c in ws[col_letter])
                 ws.column_dimensions[col_letter].width = min(50, max(12, max_len + 2))
 
-            # Stream workbook
             bio = BytesIO()
             wb.save(bio)
             bio.seek(0)
-            timestamp = now().strftime("%Y%m%d-%H%M%S")
             resp = HttpResponse(
                 bio.read(),
-                content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             )
             resp["Content-Disposition"] = f'attachment; filename="{filename}_{stamp}.xlsx"'
             return resp
 
         except ImportError:
+            # CSV fallback
             import csv
             from io import StringIO
             sio = StringIO()
             writer = csv.writer(sio)
             writer.writerow(headers)
             for rec in qs:
+                evt = rec.event
+                volunteer_email = getattr(rec.volunteer, "email", str(rec.volunteer))
+                skills_csv = _csv_from_list(_skills_list(evt))
+
+                cap_current = 0
+                cap_total   = 0
+                languages_csv = ""
+
                 writer.writerow([
-                    rec.volunteer_name,
-                    rec.event_name,
-                    rec.description or "",
-                    rec.location or "",
-                    rec.required_skills,
-                    rec.urgency,
-                    rec.event_date.strftime("%Y-%m-%d") if rec.event_date else "",
-                    f"{rec.capacity_current} / {rec.capacity_total}",
-                    rec.languages or "",
+                    volunteer_email,
+                    getattr(evt, "name", "") if evt else "",
+                    getattr(evt, "description", "") if evt else "",
+                    getattr(evt, "location", "") if evt else "",
+                    skills_csv,
+                    getattr(evt, "urgency", "") if evt else "",
+                    evt.event_date.strftime("%Y-%m-%d") if (evt and evt.event_date) else "",
+                    f"{cap_current} / {cap_total}",
+                    languages_csv,
                     rec.status,
                 ])
+
             resp = HttpResponse(sio.getvalue(), content_type="text/csv")
             resp["Content-Disposition"] = f'attachment; filename="{filename}_{stamp}.csv"'
             return resp
-    # Distinct volunteer names -> objects with id/full_name for your template
-    names = list(
-        VP.objects.order_by().values_list("volunteer_name", flat=True).distinct()
-    )
-    volunteers = [SimpleNamespace(id=n, full_name=n) for n in names]
 
-    # Status options (from DB, fallback to defaults)
+    # --------------------------- filters for dropdowns ---------------------------
+    volunteer_users = (
+        User.objects
+        .filter(assignments__isnull=False)
+        .select_related("profile")  # so we can use profile.full_name
+        .distinct()
+    )
+
+    volunteers = []
+    for u in volunteer_users:
+        # Prefer Profile.full_name, fallback to email
+        full_name = ""
+        if hasattr(u, "profile") and getattr(u.profile, "full_name", "").strip():
+            full_name = u.profile.full_name.strip()
+        else:
+            full_name = u.email
+
+        volunteers.append(
+            SimpleNamespace(
+                id=u.email,  # used in the filter value (?volunteer=...)
+                full_name=full_name,  # label shown in dropdown
+            )
+        )
+
+    # status list stays like before, based on Assignment.status
     statuses = list(
-        VP.objects.order_by().values_list("status", flat=True).distinct()
+        Assignment.objects.order_by().values_list("status", flat=True).distinct()
     )
-    statuses = sorted([s for s in statuses if s]) or ["Registered", "Attended", "No-Show", "Cancelled"]
+    statuses = sorted([s for s in statuses if s]) or [
+        Assignment.ASSIGNED,
+        Assignment.ATTENDED,
+        Assignment.NO_SHOW,
+        Assignment.CANCELLED,
+    ]
 
-    # Shape rows for the template
+    # ---------------------------- build rows for HTML ----------------------------
     rows = []
+    today = now().date()
     for r in qs:
+        evt = r.event
+        user = r.volunteer
+        volunteer_email = getattr(user, "email", str(user))
+
+        # Display name = Profile.full_name, fallback to email
+        if hasattr(user, "profile") and getattr(user.profile, "full_name", "").strip():
+            volunteer_display_name = user.profile.full_name.strip()
+        else:
+            volunteer_display_name = volunteer_email
+
+        skills = _skills_list(evt)
+        event_date = evt.event_date if (evt and evt.event_date) else None
+        is_completed = bool(event_date and event_date < today)
+
+        cap_current = 0
+        cap_total = 0
+        languages_list = []
+
         rows.append({
             "id": r.id,
-            "volunteer_id": r.volunteer_name,  # using name as identifier
-            "volunteer_name": r.volunteer_name,
-            "event_name": r.event_name,
-            "description": r.description,
-            "location": r.location,
-            "required_skills": [s.strip() for s in (r.required_skills or "").split(",") if s.strip()],
-            "urgency": r.urgency,
-            "event_date": r.event_date,
-            "event_date_iso": r.event_date.isoformat() if r.event_date else "",
-            "capacity": f"{r.capacity_current} / {r.capacity_total}",
-            "languages": [l.strip() for l in (r.languages or "").split(",") if l.strip()],
+            "volunteer_id": volunteer_email,  # filter identifier
+            "volunteer_name": volunteer_display_name,  # Full Name in table
+            "event_name": getattr(evt, "name", "") if evt else "",
+            "description": getattr(evt, "description", "") if evt else "",
+            "location": getattr(evt, "location", "") if evt else "",
+            "required_skills": skills,
+            "urgency": getattr(evt, "urgency", "") if evt else "",
+            "event_date": event_date,
+            "event_date_iso": event_date.isoformat() if event_date else "",
+            "capacity": f"{cap_current} / {cap_total}",
+            "languages": languages_list,
             "status": r.status,
+            "is_completed": is_completed,
         })
 
     return render(
@@ -250,7 +332,7 @@ def volunteer_history(request):
             "volunteers": volunteers,
             "statuses": statuses,
             "count": len(rows),
-            "filter": {  # NOTE: the template we set up earlier expects "filter", not "filters"
+            "filter": {
                 "volunteer": volunteer,
                 "status": status,
                 "from_date": d_from.isoformat() if d_from else "",
