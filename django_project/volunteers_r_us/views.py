@@ -21,6 +21,8 @@ import logging
 from django.conf import settings
 from .models import VolunteerParticipation as VP
 from django.utils.timezone import now
+from django.contrib.admin.views.decorators import staff_member_required
+
 User = get_user_model()
 
 def home(request):
@@ -98,6 +100,7 @@ def logout_view(request):
 from django.shortcuts import render
 
 @login_required
+@staff_member_required
 def volunteer_history(request):
     if request.GET.get("reset") == "1":
         return redirect(request.path)
@@ -304,6 +307,7 @@ def profile_form(request):
     return render(request, "profile_form.html", ctx)
 
 @login_required
+@staff_member_required
 def event_form(request):
     form = EventForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
