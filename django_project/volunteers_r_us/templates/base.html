@@ -17,10 +17,17 @@
 
       <!-- Right-side actions -->
       <div class="ms-auto d-flex align-items-center gap-2">
-        <a class="btn btn-outline-primary" href="{% url 'volunteer_history' %}">Volunteer History</a>
-        <a class="btn btn-outline-secondary" href="{% url 'event_form' %}">Events</a>
-        <a class="btn btn-outline-secondary" href="{% url 'match_volunteer' %}">Match</a>
-        <a class="btn btn-outline-secondary" href="{% url 'profile_form' %}">Profile</a>
+        {# Admin-only links #}
+        {% if user.is_authenticated and user.is_staff %}
+          <a class="btn btn-outline-primary" href="{% url 'volunteer_history' %}">Volunteer History</a>
+          <a class="btn btn-outline-secondary" href="{% url 'event_form' %}">Events</a>
+          <a class="btn btn-outline-secondary" href="{% url 'match_volunteer' %}">Match</a>
+        {% endif %}
+
+        {# Visible to any logged-in user #}
+        {% if user.is_authenticated %}
+          <a class="btn btn-outline-secondary" href="{% url 'profile_form' %}">Profile</a>
+        {% endif %}
 
 
         <!-- Notifications: always visible -->
