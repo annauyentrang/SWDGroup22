@@ -4,6 +4,8 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.db import transaction
 from django.core.mail import send_mail
 from django.conf import settings
+from django.contrib.admin.views.decorators import staff_member_required
+
 
 from .models import Event, Profile, Skill, Assignment
 from .choices import SKILL_CHOICES
@@ -25,6 +27,7 @@ def _skill_overlap(profile, required_codes):
     return bool(set(profile.skills or []).intersection(required_codes))
 
 @login_required
+@staff_member_required
 def matching_page(request):
     # Pull everything the template needs
     volunteers = (
