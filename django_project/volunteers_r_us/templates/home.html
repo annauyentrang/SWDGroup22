@@ -1,17 +1,35 @@
 {% extends 'base.html' %}
-{% block title %}Home • VolunteerHub{% endblock %}
+{% block title %}Home • VolunteersRUs{% endblock %}
 {% block content %}
 <div class="row justify-content-center">
   <div class="col-lg-7">
     <div class="p-4 p-md-5 bg-white border rounded-3">
-      <h1 class="h3 mb-3">Welcome to VolunteersRUs</h1>
-      <p class="text-secondary">
-        Front-end.
-      </p>
-      <div class="d-flex gap-2">
-        <a class="btn btn-primary" href="{% url 'login' %}">Go to Login</a>
-        <a class="btn btn-outline-primary" href="{% url 'register' %}">Create an Account</a>
-      </div>
+
+      {% if user.is_authenticated %}
+        <h1 class="h3 mb-3">
+          Welcome back, {{ user.first_name|default:user.email }}!
+        </h1>
+        <p class="text-muted mb-3">What would you like to do today?</p>
+
+        <div class="d-flex flex-wrap gap-2">
+          <a class="btn btn-primary" href="{% url 'profile_form' %}">View / Edit Profile</a>
+
+          {% if user.is_staff %}
+            <a class="btn btn-outline-primary" href="{% url 'volunteer_history' %}">Volunteer History</a>
+            <a class="btn btn-outline-secondary" href="{% url 'event_form' %}">Manage Events</a>
+            <a class="btn btn-outline-secondary" href="{% url 'match_volunteer' %}">Match Volunteers</a>
+          {% endif %}
+        </div>
+
+      {% else %}
+        <h1 class="h3 mb-3">Welcome to VolunteersRUs</h1>
+        <p class="text-muted mb-3">Sign in or create an account to start volunteering.</p>
+        <div class="d-flex gap-2">
+          <a class="btn btn-primary" href="{% url 'login' %}">Go to Login</a>
+          <a class="btn btn-outline-primary" href="{% url 'register' %}">Create an Account</a>
+        </div>
+      {% endif %}
+
     </div>
   </div>
 </div>
