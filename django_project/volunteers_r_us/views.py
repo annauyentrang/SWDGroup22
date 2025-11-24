@@ -391,9 +391,55 @@ def profile_form(request):
 @login_required
 @staff_member_required
 def event_form(request):
+    # --- CSV EXPORT BRANCH (GET ?export=1) ---
+    if request.GET.get("export") == "1":
+        import csv
+        from io import StringIO
+
+        # All events, ordered by date then name
+        qs = Event.objects.all().order_by("event_date", "name")
+
+        headers = [
+            "Event Name",
+            "Description",
+            "Location",
+            "Required Skills",
+            "Urgency",
+            "Event Date",
+        ]
+
+        sio = StringIO()
+        writer = csv.writer(sio)
+        writer.writerow(headers)
+
+        for evt in qs:
+            skills_csv = _csv_from_list(_skills_list(evt))
+
+            writer.writerow([
+                getattr(evt, "name", "") or "",
+                getattr(evt, "description", "") or "",
+                getattr(evt, "location", "") or "",
+                skills_csv,
+                getattr(evt, "urgency", "") or "",
+                evt.event_date.strftime("%Y-%m-%d") if getattr(evt, "event_date", None) else "",
+            ])
+
+        stamp = now().strftime("%Y%m%d-%H%M%S")
+        resp = HttpResponse(
+            sio.getvalue(),
+            content_type="text/csv",
+        )
+        resp["Content-Disposition"] = f'attachment; filename="events_{stamp}.csv"'
+        return resp
+
+    # --- NORMAL FORM HANDLING (EXISTING BEHAVIOR) ---
     form = EventForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
         event = form.save()
         # If you need JSON for AJAX, add a branch here.
         return redirect("home")
-    return render(request, "event_form.html", {"form": form})
+    events = Event.objects.all().order_by("-event_date")
+
+    return render(request, "event_form.html", {
+        "form": form,
+        "events": events})
