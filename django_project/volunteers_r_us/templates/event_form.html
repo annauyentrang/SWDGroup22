@@ -9,8 +9,14 @@
       <div class="bg-white border rounded-3 p-4 p-md-5">
         <div class="d-flex align-items-center justify-content-between mb-3">
           <h1 class="h4 mb-0">Event Management</h1>
-          <a class="btn btn-outline-secondary btn-sm" href="{% url 'home' %}">Back to Home</a>
+          <div class="d-flex gap-2">
+            <a class="btn btn-outline-success btn-sm" href="?export=1">
+              Download CSV
+            </a>
+            <a class="btn btn-outline-secondary btn-sm" href="{% url 'home' %}">Back to Home</a>
+          </div>
         </div>
+
         <p class="text-secondary">Administrators can create and manage events using this form.</p>
 
         <form id="event-form" method="post" novalidate>
@@ -80,4 +86,45 @@
   </div>
 </div>
 <script type="module" src="{% static 'match.js' %}"></script>
+<hr class="my-4">
+
+<h5 class="mb-3">Existing Events</h5>
+
+<div class="table-responsive">
+  <table class="table table-bordered table-hover align-middle">
+    <thead class="table-light">
+      <tr>
+        <th>Name</th>
+        <th>Description</th>
+        <th>Location</th>
+        <th>Skills</th>
+        <th>Urgency</th>
+        <th>Date</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for event in events %}
+        <tr>
+          <td>{{ event.name }}</td>
+          <td>{{ event.description }}</td>
+          <td>{{ event.location }}</td>
+          <td>
+            {% for skill in event.required_skills.all %}
+              <span class="badge bg-secondary me-1">{{ skill.name }}</span>
+            {% empty %}
+              <span class="text-muted">None</span>
+            {% endfor %}
+          </td>
+          <td>{{ event.urgency }}</td>
+          <td>{{ event.event_date }}</td>
+        </tr>
+      {% empty %}
+        <tr>
+          <td colspan="6" class="text-center text-muted">No events added yet.</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
 {% endblock %}
