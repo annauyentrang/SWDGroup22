@@ -143,15 +143,9 @@
                 <td>{{ r.capacity }}</td>
                 <td>{% for lang in r.languages %}<span class="chip">{{ lang }}</span>{% endfor %}</td>
                 <td>
-                  {% if r.status == "Registered" %}
-                    <span class="badge rounded-pill bg-secondary">Registered</span>
-                  {% elif r.status == "Attended" %}
-                    <span class="badge rounded-pill text-bg-success">Attended</span>
-                  {% elif r.status == "No-Show" %}
-                    <span class="badge rounded-pill text-bg-danger">No-Show</span>
-                  {% else %}
-                    <span class="badge rounded-pill text-bg-dark">Cancelled</span>
-                  {% endif %}
+                  <span class="badge rounded-pill {{ r.status_class }}">
+                    {{ r.status_display }}
+                  </span>
                 </td>
               </tr>
               {% empty %}
