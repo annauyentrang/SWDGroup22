@@ -172,6 +172,14 @@
               href="?export=1{% if filter.volunteer %}&volunteer={{ filter.volunteer|urlencode }}{% endif %}{% if filter.status %}&status={{ filter.status|urlencode }}{% endif %}{% if filter.from_date %}&from_date={{ filter.from_date|urlencode }}{% endif %}">
               Export csv
             </a>
+
+            <a class="btn btn-outline-danger btn-sm"
+                  href="?export_pdf=1{% if filter.volunteer %}&volunteer={{ filter.volunteer|urlencode }}{% endif %}
+                                {% if filter.status %}&status={{ filter.status|urlencode }}{% endif %}
+                                {% if filter.from_date %}&from_date={{ filter.from_date|urlencode }}{% endif %}">
+                  Export PDF
+                </a>
+
             <button class="btn btn-outline-secondary btn-sm" type="button" onclick="window.print()">Print</button>
           </div>
         </div>

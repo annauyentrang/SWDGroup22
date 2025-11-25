@@ -8,14 +8,18 @@
     <div class="col-lg-8">
       <div class="bg-white border rounded-3 p-4 p-md-5">
         <div class="d-flex align-items-center justify-content-between mb-3">
-          <h1 class="h4 mb-0">Event Management</h1>
-          <div class="d-flex gap-2">
-            <a class="btn btn-outline-success btn-sm" href="?export=1">
-              Download CSV
-            </a>
-            <a class="btn btn-outline-secondary btn-sm" href="{% url 'home' %}">Back to Home</a>
-          </div>
+        <h1 class="h4 mb-0">Event Management</h1>
+        <div class="d-flex gap-2">
+          <a class="btn btn-outline-success btn-sm" href="?export=1">
+            Download CSV
+          </a>
+          <a class="btn btn-outline-danger btn-sm" href="?export_pdf=1">
+            Download PDF
+          </a>
+          <a class="btn btn-outline-secondary btn-sm" href="{% url 'home' %}">Back to Home</a>
         </div>
+      </div>
+
 
         <p class="text-secondary">Administrators can create and manage events using this form.</p>
 

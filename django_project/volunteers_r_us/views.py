@@ -123,6 +123,62 @@ def _skills_list(event):
 def _csv_from_list(values):
     return ", ".join(v for v in values if v)
 
+from io import BytesIO  
+
+def _pdf_table_response(headers, rows, filename_base):
+    """
+    Simple helper to turn a table (headers + rows) into a PDF download.
+    Uses reportlab to draw a basic landscape table.
+    """
+    from reportlab.lib.pagesizes import letter, landscape
+    from reportlab.pdfgen import canvas
+
+    buffer = BytesIO()
+    page_size = landscape(letter)
+    pdf = canvas.Canvas(buffer, pagesize=page_size)
+    width, height = page_size
+
+    left_margin = 40
+    bottom_margin = 40
+    top_margin = height - 40
+    line_height = 14
+
+    col_width = (width - 2 * left_margin) / max(1, len(headers))
+
+    def draw_header():
+        pdf.setFont("Helvetica-Bold", 10)
+        y = top_margin
+        for i, h in enumerate(headers):
+            x = left_margin + i * col_width
+            pdf.drawString(x, y, str(h))
+        return y - line_height
+
+    y = draw_header()
+    pdf.setFont("Helvetica", 9)
+
+    for row in rows:
+        if y < bottom_margin:
+            pdf.showPage()
+            pdf.setFont("Helvetica-Bold", 10)
+            y = draw_header()
+            pdf.setFont("Helvetica", 9)
+
+        for i, cell in enumerate(row):
+            x = left_margin + i * col_width
+            text = "" if cell is None else str(cell)
+            pdf.drawString(x, y, text)
+        y -= line_height
+
+    pdf.showPage()
+    pdf.save()
+    buffer.seek(0)
+
+    stamp = now().strftime("%Y%m%d-%H%M%S")
+    filename = f"{filename_base}_{stamp}.pdf"
+
+    resp = HttpResponse(buffer.read(), content_type="application/pdf")
+    resp["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return resp
 
 @login_required
 @staff_member_required
@@ -221,9 +277,11 @@ def volunteer_history(request):
             # CSV fallback
             import csv
             from io import StringIO
+
             sio = StringIO()
             writer = csv.writer(sio)
             writer.writerow(headers)
+
             for rec in qs:
                 evt = rec.event
                 volunteer_email = getattr(rec.volunteer, "email", str(rec.volunteer))
@@ -246,9 +304,51 @@ def volunteer_history(request):
                     rec.status,
                 ])
 
-            resp = HttpResponse(sio.getvalue(), content_type="text/csv")
+            resp = HttpResponse(
+                sio.getvalue(),
+                content_type="text/csv",
+            )
             resp["Content-Disposition"] = f'attachment; filename="{filename}_{stamp}.csv"'
             return resp
+
+    # --------------------------- PDF export branch ---------------------------
+    if request.GET.get("export_pdf") == "1":
+        headers = [
+            "Volunteer", "Event Name", "Description", "Location",
+            "Required Skills", "Urgency", "Event Date",
+            "Capacity (current / total)", "Languages", "Status",
+        ]
+        filename = "volunteer_history"
+        if volunteer:
+            filename += f"_{volunteer}"
+        if status:
+            filename += f"_{status}"
+
+        rows = []
+        for rec in qs:
+            evt = rec.event
+            volunteer_email = getattr(rec.volunteer, "email", str(rec.volunteer))
+            skills_csv = _csv_from_list(_skills_list(evt))
+
+            # still placeholders for capacity/languages
+            cap_current = 0
+            cap_total   = 0
+            languages_csv = ""
+
+            rows.append([
+                volunteer_email,
+                getattr(evt, "name", "") if evt else "",
+                getattr(evt, "description", "") if evt else "",
+                getattr(evt, "location", "") if evt else "",
+                skills_csv,
+                getattr(evt, "urgency", "") if evt else "",
+                evt.event_date.strftime("%Y-%m-%d") if (evt and evt.event_date) else "",
+                f"{cap_current} / {cap_total}",
+                languages_csv,
+                rec.status,
+            ])
+
+        return _pdf_table_response(headers, rows, filename_base=filename)
 
     # --------------------------- filters for dropdowns ---------------------------
     volunteer_users = (
@@ -431,6 +531,34 @@ def event_form(request):
         )
         resp["Content-Disposition"] = f'attachment; filename="events_{stamp}.csv"'
         return resp
+
+        # --- PDF EXPORT BRANCH (GET ?export_pdf=1) ---
+    if request.GET.get("export_pdf") == "1":
+        # All events, ordered by date then name
+        qs = Event.objects.all().order_by("event_date", "name")
+
+        headers = [
+            "Event Name",
+            "Description",
+            "Location",
+            "Required Skills",
+            "Urgency",
+            "Event Date",
+        ]
+
+        rows = []
+        for evt in qs:
+            skills_csv = _csv_from_list(_skills_list(evt))
+            rows.append([
+                evt.name,
+                evt.description,
+                evt.location,
+                skills_csv,
+                evt.urgency,
+                evt.event_date.strftime("%Y-%m-%d") if evt.event_date else "",
+            ])
+
+        return _pdf_table_response(headers, rows, filename_base="events")
 
     # --- NORMAL FORM HANDLING (EXISTING BEHAVIOR) ---
     form = EventForm(request.POST or None)
