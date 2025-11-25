@@ -125,105 +125,129 @@ def _csv_from_list(values):
 
 from io import BytesIO  
 
-def _pdf_table_response(columns, rows, filename_base="report", filename_prefix=None):
-    from reportlab.lib.pagesizes import landscape, letter
-    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
-    from reportlab.lib import colors
-    from io import BytesIO
+from io import BytesIO
 
+def _pdf_table_response(columns, rows, filename_base="report", filename_prefix=None):
+    """
+    Generic PDF table helper used by:
+      - volunteer_history (10 columns)
+      - event_form (6 columns)
+
+    It:
+      * Fits the table to the page width
+      * Gives more room to text-heavy columns (Description, Required Skills, Capacity)
+      * Wraps long text inside cells so headers/values stay inside their cells
+    """
     if filename_prefix is None:
         filename_prefix = filename_base
 
+    from reportlab.lib.pagesizes import landscape, letter
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
+    from reportlab.lib import colors
+    from reportlab.lib.styles import getSampleStyleSheet
+
     buffer = BytesIO()
-    doc = SimpleDocTemplate(
-        buffer,
-        pagesize=landscape(letter),
-        leftMargin=30,
-        rightMargin=30,
-        topMargin=30,
-        bottomMargin=30,
-    )
+    page_size = landscape(letter)
+    page_width, page_height = page_size
 
-    # Combine header + data
+    # Margins and usable width
+    left_margin = right_margin = 30
+    top_margin = bottom_margin = 30
+    usable_width = page_width - (left_margin + right_margin)
+
+    # Build raw data: header row + data rows
     data = [columns] + rows
+    num_cols = len(columns)
 
-    # Create table with automatic column widths
-    table = Table(data, repeatRows=1)
+    # --------- Column width weights (relative, not pixels) ----------
+    if num_cols == 10:
+        # volunteer_history: [Volunteer, Event, Description, Location, Required Skills,
+        #                     Urgency, Event Date, Capacity, Languages, Status]
+        weights = [
+            1.1,  # Volunteer
+            1.0,  # Event Name
+            1.5,  # Description
+            0.8,  # Location
+            2.3,  # Required Skills  (wide)
+            0.7,  # Urgency
+            1.0,  # Event Date
+            2.0,  # Capacity (current / total)
+            0.8,  # Languages
+            0.6,  # Status
+        ]
+    elif num_cols == 6:
+        # events: [Event Name, Description, Location, Required Skills, Urgency, Event Date]
+        weights = [
+            1.3,  # Event Name
+            1.7,  # Description
+            1.0,  # Location
+            2.4,  # Required Skills (wide)
+            0.7,  # Urgency
+            0.9,  # Event Date
+        ]
+    else:
+        # Fallback: equal widths
+        weights = [1.0] * num_cols
 
-    # Styling to make it readable
-    table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 9),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
-        ('TOPPADDING', (0, 0), (-1, -1), 6),
-        ('GRID', (0, 0), (-1, -1), 0.25, colors.grey),
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-    ]))
+    total_weight = sum(weights)
+    col_widths = [usable_width * (w / total_weight) for w in weights]
 
-    # Build PDF
-    doc.build([table])
+    # --------- Convert all cells to Paragraphs so they wrap ---------
+    styles = getSampleStyleSheet()
+    body_style = styles["BodyText"]
+    body_style.fontSize = 8
+    body_style.leading = 10
+    body_style.wordWrap = "CJK"
 
-    # Return HTTP response
-    buffer.seek(0)
-    response = HttpResponse(buffer, content_type='application/pdf')
-    response['Content-Disposition'] = f'attachment; filename="{filename_prefix}.pdf"'
-    return response
+    header_style = styles["BodyText"]
+    header_style.fontSize = 8
+    header_style.leading = 10
+    header_style.wordWrap = "CJK"
+    header_style.fontName = "Helvetica-Bold"
 
-
-    def draw_header():
-        pdf.setFont("Helvetica-Bold", 10)
-        y = top_margin
-        for i, h in enumerate(headers):
-            x = left_margin + i * col_width
-            pdf.drawString(x, y, str(h))
-        return y - line_height
-
-        import textwrap
-
-    y = draw_header()
-    pdf.setFont("Helvetica", 9)
-
-    for row in rows:
-        # Wrap each cell so long text doesn't overflow the column
-        wrapped_cells = []
-        max_lines = 1
-        approx_chars = max(1, int(col_width // 6))  # rough guess: ~6px per char
-
+    para_data = []
+    for row_idx, row in enumerate(data):
+        new_row = []
         for cell in row:
             text = "" if cell is None else str(cell)
-            lines = textwrap.wrap(text, approx_chars) or [""]
-            wrapped_cells.append(lines)
-            if len(lines) > max_lines:
-                max_lines = len(lines)
+            if row_idx == 0:
+                new_row.append(Paragraph(text, header_style))
+            else:
+                new_row.append(Paragraph(text, body_style))
+        para_data.append(new_row)
 
-        # New page if needed
-        if y - line_height * max_lines < bottom_margin:
-            pdf.showPage()
-            pdf.setFont("Helvetica-Bold", 10)
-            y = draw_header()
-            pdf.setFont("Helvetica", 9)
+    # --------- Create document & table ----------
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=page_size,
+        leftMargin=left_margin,
+        rightMargin=right_margin,
+        topMargin=top_margin,
+        bottomMargin=bottom_margin,
+    )
 
-        # Draw each visual line of the row
-        for line_idx in range(max_lines):
-            for i, lines in enumerate(wrapped_cells):
-                x = left_margin + i * col_width
-                text_line = lines[line_idx] if line_idx < len(lines) else ""
-                pdf.drawString(x, y, text_line)
-            y -= line_height
+    table = Table(para_data, colWidths=col_widths, repeatRows=1)
 
-    pdf.save()
+    # --------- Styling (grid, alignment, etc.) ----------
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.black),
+        ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+        ("FONTSIZE", (0, 0), (-1, -1), 8),
+        ("BOTTOMPADDING", (0, 0), (-1, 0), 6),
+        ("TOPPADDING", (0, 0), (-1, 0), 4),
+        ("TOPPADDING", (0, 1), (-1, -1), 3),
+        ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+    ]))
+
+    doc.build([table])
 
     buffer.seek(0)
+    response = HttpResponse(buffer, content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="{filename_prefix}.pdf"'
+    return response
 
-    stamp = now().strftime("%Y%m%d-%H%M%S")
-    filename = f"{filename_base}_{stamp}.pdf"
-
-    resp = HttpResponse(buffer.read(), content_type="application/pdf")
-    resp["Content-Disposition"] = f'attachment; filename="{filename}"'
-    return resp
 
 @login_required
 @staff_member_required
