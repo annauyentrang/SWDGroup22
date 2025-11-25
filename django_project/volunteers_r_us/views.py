@@ -125,25 +125,53 @@ def _csv_from_list(values):
 
 from io import BytesIO  
 
-def _pdf_table_response(headers, rows, filename_base):
-    """
-    Simple helper to turn a table (headers + rows) into a PDF download.
-    Uses reportlab to draw a basic landscape table.
-    """
-    from reportlab.lib.pagesizes import letter, landscape
-    from reportlab.pdfgen import canvas
+def _pdf_table_response(columns, rows, filename_base="report", filename_prefix=None):
+    from reportlab.lib.pagesizes import landscape, letter
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
+    from reportlab.lib import colors
+    from io import BytesIO
+
+    if filename_prefix is None:
+        filename_prefix = filename_base
 
     buffer = BytesIO()
-    page_size = landscape(letter)
-    pdf = canvas.Canvas(buffer, pagesize=page_size)
-    width, height = page_size
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=landscape(letter),
+        leftMargin=30,
+        rightMargin=30,
+        topMargin=30,
+        bottomMargin=30,
+    )
 
-    left_margin = 40
-    bottom_margin = 40
-    top_margin = height - 40
-    line_height = 14
+    # Combine header + data
+    data = [columns] + rows
 
-    col_width = (width - 2 * left_margin) / max(1, len(headers))
+    # Create table with automatic column widths
+    table = Table(data, repeatRows=1)
+
+    # Styling to make it readable
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('GRID', (0, 0), (-1, -1), 0.25, colors.grey),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+    ]))
+
+    # Build PDF
+    doc.build([table])
+
+    # Return HTTP response
+    buffer.seek(0)
+    response = HttpResponse(buffer, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="{filename_prefix}.pdf"'
+    return response
+
 
     def draw_header():
         pdf.setFont("Helvetica-Bold", 10)
@@ -153,24 +181,41 @@ def _pdf_table_response(headers, rows, filename_base):
             pdf.drawString(x, y, str(h))
         return y - line_height
 
+        import textwrap
+
     y = draw_header()
     pdf.setFont("Helvetica", 9)
 
     for row in rows:
-        if y < bottom_margin:
+        # Wrap each cell so long text doesn't overflow the column
+        wrapped_cells = []
+        max_lines = 1
+        approx_chars = max(1, int(col_width // 6))  # rough guess: ~6px per char
+
+        for cell in row:
+            text = "" if cell is None else str(cell)
+            lines = textwrap.wrap(text, approx_chars) or [""]
+            wrapped_cells.append(lines)
+            if len(lines) > max_lines:
+                max_lines = len(lines)
+
+        # New page if needed
+        if y - line_height * max_lines < bottom_margin:
             pdf.showPage()
             pdf.setFont("Helvetica-Bold", 10)
             y = draw_header()
             pdf.setFont("Helvetica", 9)
 
-        for i, cell in enumerate(row):
-            x = left_margin + i * col_width
-            text = "" if cell is None else str(cell)
-            pdf.drawString(x, y, text)
-        y -= line_height
+        # Draw each visual line of the row
+        for line_idx in range(max_lines):
+            for i, lines in enumerate(wrapped_cells):
+                x = left_margin + i * col_width
+                text_line = lines[line_idx] if line_idx < len(lines) else ""
+                pdf.drawString(x, y, text_line)
+            y -= line_height
 
-    pdf.showPage()
     pdf.save()
+
     buffer.seek(0)
 
     stamp = now().strftime("%Y%m%d-%H%M%S")
