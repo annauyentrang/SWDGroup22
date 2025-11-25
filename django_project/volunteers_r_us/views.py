@@ -236,7 +236,14 @@ def volunteer_history(request):
 
             for rec in qs:
                 evt = rec.event
-                volunteer_email = getattr(rec.volunteer, "email", str(rec.volunteer))
+                user = rec.volunteer
+
+                # Full name if available, otherwise email
+                if hasattr(user, "profile") and getattr(user.profile, "full_name", "").strip():
+                    volunteer_name = user.profile.full_name.strip()
+                else:
+                    volunteer_name = getattr(user, "email", str(user))
+
                 skills_csv = _csv_from_list(_skills_list(evt))
 
                 # No capacity/languages fields in Event yet: use placeholders
@@ -244,8 +251,14 @@ def volunteer_history(request):
                 cap_total   = 0
                 languages_csv = ""
 
+                # Use display label for status if choices are defined
+                if hasattr(rec, "get_status_display"):
+                    status_display = rec.get_status_display()
+                else:
+                    status_display = rec.status or ""
+
                 ws.append([
-                    volunteer_email,
+                    volunteer_name,
                     getattr(evt, "name", "") if evt else "",
                     getattr(evt, "description", "") if evt else "",
                     getattr(evt, "location", "") if evt else "",
@@ -254,7 +267,7 @@ def volunteer_history(request):
                     evt.event_date.strftime("%Y-%m-%d") if (evt and evt.event_date) else "",
                     f"{cap_current} / {cap_total}",
                     languages_csv,
-                    rec.status,
+                    status_display,
                 ])
 
             # rough autofit
@@ -284,15 +297,26 @@ def volunteer_history(request):
 
             for rec in qs:
                 evt = rec.event
-                volunteer_email = getattr(rec.volunteer, "email", str(rec.volunteer))
+                user = rec.volunteer
+
+                if hasattr(user, "profile") and getattr(user.profile, "full_name", "").strip():
+                    volunteer_name = user.profile.full_name.strip()
+                else:
+                    volunteer_name = getattr(user, "email", str(user))
+
                 skills_csv = _csv_from_list(_skills_list(evt))
 
                 cap_current = 0
                 cap_total   = 0
                 languages_csv = ""
 
+                if hasattr(rec, "get_status_display"):
+                    status_display = rec.get_status_display()
+                else:
+                    status_display = rec.status or ""
+
                 writer.writerow([
-                    volunteer_email,
+                    volunteer_name,
                     getattr(evt, "name", "") if evt else "",
                     getattr(evt, "description", "") if evt else "",
                     getattr(evt, "location", "") if evt else "",
@@ -301,7 +325,7 @@ def volunteer_history(request):
                     evt.event_date.strftime("%Y-%m-%d") if (evt and evt.event_date) else "",
                     f"{cap_current} / {cap_total}",
                     languages_csv,
-                    rec.status,
+                    status_display,
                 ])
 
             resp = HttpResponse(
@@ -407,6 +431,25 @@ def volunteer_history(request):
         cap_total = 0
         languages_list = []
 
+        # Normalize status for display + styling
+        raw_status = r.status or ""
+        if hasattr(r, "get_status_display"):
+            status_display = r.get_status_display() or raw_status
+        else:
+            status_display = raw_status
+
+        s_lower = raw_status.replace("_", "-").lower()
+        if s_lower in ("assigned", "registered"):
+            status_class = "bg-secondary"
+        elif s_lower == "attended":
+            status_class = "text-bg-success"
+        elif s_lower in ("no-show", "no show", "no_show"):
+            status_class = "text-bg-danger"
+        elif s_lower in ("cancelled", "canceled"):
+            status_class = "text-bg-warning"
+        else:
+            status_class = "text-bg-dark"
+
         rows.append({
             "id": r.id,
             "volunteer_id": volunteer_email,  # filter identifier
@@ -420,9 +463,12 @@ def volunteer_history(request):
             "event_date_iso": event_date.isoformat() if event_date else "",
             "capacity": f"{cap_current} / {cap_total}",
             "languages": languages_list,
-            "status": r.status,
+            "status": raw_status,
+            "status_display": status_display,
+            "status_class": status_class,
             "is_completed": is_completed,
         })
+
 
     return render(
         request,
